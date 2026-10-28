@@ -14,16 +14,16 @@ Rules for code in this repo. They're short so they can actually be followed. If 
 
 ## 2. Naming
 
-| Thing | Style | Example |
-|---|---|---|
-| Files | kebab-case with a role suffix | `sessions.routes.ts`, `mock-cluster.gateway.ts` |
-| Types / schemas | PascalCase; schemas end in `Schema` | `SessionView`, `CreateSessionBodySchema` |
-| Functions / vars | camelCase, verbs for functions | `startSession`, `isValidFix` |
-| Constants | UPPER_SNAKE_CASE | `LOCK_KEY` |
-| JSON over HTTP | camelCase | `sessionId` |
-| DynamoDB attributes, event log, Athena | snake_case | `session_id` |
-| Env vars | UPPER_SNAKE_CASE | `SESSIONS_TABLE` |
-| Error codes | UPPER_SNAKE_CASE | `SESSION_BUSY` |
+| Thing                                  | Style                               | Example                                         |
+| -------------------------------------- | ----------------------------------- | ----------------------------------------------- |
+| Files                                  | kebab-case with a role suffix       | `sessions.routes.ts`, `mock-cluster.gateway.ts` |
+| Types / schemas                        | PascalCase; schemas end in `Schema` | `SessionView`, `CreateSessionBodySchema`        |
+| Functions / vars                       | camelCase, verbs for functions      | `startSession`, `isValidFix`                    |
+| Constants                              | UPPER_SNAKE_CASE                    | `LOCK_KEY`                                      |
+| JSON over HTTP                         | camelCase                           | `sessionId`                                     |
+| DynamoDB attributes, event log, Athena | snake_case                          | `session_id`                                    |
+| Env vars                               | UPPER_SNAKE_CASE                    | `SESSIONS_TABLE`                                |
+| Error codes                            | UPPER_SNAKE_CASE                    | `SESSION_BUSY`                                  |
 
 The camelCase ↔ snake_case mapping happens **only in repos** (`toItem` / `fromItem`). The rest of the code never sees snake_case.
 
@@ -42,6 +42,7 @@ sessions/
 ```
 
 Rules:
+
 - **Dependency direction**: routes → service → repo/gateway → platform. Never the other way.
 - Other modules import only from `modules/<x>/index.ts`, never from deep files.
 - **Services take their dependencies as arguments** (simple factory functions, no DI framework):

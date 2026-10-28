@@ -2,6 +2,7 @@
 
 > Read this first. It explains what this repo is, what it is not, and the rules for working in it.
 > Deeper docs:
+>
 > - `docs/ARCHITECTURE.md`: processes, modules, HTTP API, data shapes, and the contracts with other repos
 > - `docs/CONVENTIONS.md`: how code is written here
 > - `docs/DECISIONS.md`: what we decided, why, current limitations and future improvements
@@ -18,17 +19,18 @@ ITESO course project, team **Cafeinomanos**: Ian Rodríguez (infra and orchestra
 
 The system is split into three repos:
 
-| Repo | Contains |
-|---|---|
+| Repo                                     | Contains                                                                                                                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **`oncall-training-backend`** (this one) | The **API** (Express HTTP server) and the **worker** (consumes user actions, monitors the mock system, detects resolution). Scenario definitions. The OpenAPI spec. A Dockerfile and docker-compose for local dev. |
-| `oncall-training-frontend` | React SPA. Generates its API types from this repo's `openapi/openapi.json`. |
-| `oncall-training-infra` | Terraform (all AWS resources), Kubernetes manifests (including this repo's Deployments, ServiceAccounts and RBAC), the Step Functions definition, the **injector** and the **mock system**. |
+| `oncall-training-frontend`               | React SPA. Generates its API types from this repo's `openapi/openapi.json`.                                                                                                                                        |
+| `oncall-training-infra`                  | Terraform (all AWS resources), Kubernetes manifests (including this repo's Deployments, ServiceAccounts and RBAC), the Step Functions definition, the **injector** and the **mock system**.                        |
 
 **Not in this repo:** Terraform, k8s manifests, the state machine definition, the injector, the mock services, and frontend code. If a task needs a change there, describe the change needed (contract plus reason) and stop. Don't create those files here.
 
 ## 3. MVP scope
 
 In scope:
+
 - **Per-user identity and data separation.** Users sign up and sign in with Cognito. Every session, score, history entry, stat and event belongs to one user (`user_id` = Cognito `sub`). A user can only see their own sessions, history and stats. The leaderboard is the only shared view (username + score).
 - **One** scenario end to end.
 - One session running at a time across the whole system (global lock).
@@ -41,25 +43,25 @@ Out of scope unless the team asks: **editable profiles** (no profile page, avata
 
 ## 4. Stack
 
-| Concern | Choice |
-|---|---|
-| Runtime | Node.js 22 LTS |
-| Language | TypeScript, `strict`, **ESM** (`"type": "module"`, `module: NodeNext`) |
-| Package manager | **pnpm** |
-| HTTP | **Express 5** |
-| Validation and contracts | **zod**, plus `@asteasolutions/zod-to-openapi` to generate `openapi/openapi.json` |
-| Auth | Amazon Cognito access tokens verified with `aws-jwt-verify` |
-| AWS | AWS SDK for JavaScript v3: `client-dynamodb` + `lib-dynamodb`, `client-sqs`, `client-sfn`, `client-s3`, `client-athena` |
-| Cache / lock | Redis (ElastiCache Valkey/Redis in AWS) via `ioredis` |
-| Kubernetes | `@kubernetes/client-node` (reads and fixes the mock system) |
-| Logging | `pino` + `pino-http` (JSON) |
-| IDs | ULID (`ulid`) |
-| Tests | **Vitest** + `supertest`; integration tests against docker-compose |
-| Lint / format | ESLint (typescript-eslint) + Prettier |
-| Dev / build | `tsx watch` for dev, `tsc` for build |
-| Container | Multi-stage Dockerfile, `node:22-alpine`, non-root |
-| Local AWS | **LocalStack** (DynamoDB, S3, SQS, Step Functions) + Redis in docker-compose |
-| CI | GitHub Actions |
+| Concern                  | Choice                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Runtime                  | Node.js 22 LTS                                                                                                          |
+| Language                 | TypeScript, `strict`, **ESM** (`"type": "module"`, `module: NodeNext`)                                                  |
+| Package manager          | **pnpm**                                                                                                                |
+| HTTP                     | **Express 5**                                                                                                           |
+| Validation and contracts | **zod**, plus `@asteasolutions/zod-to-openapi` to generate `openapi/openapi.json`                                       |
+| Auth                     | Amazon Cognito access tokens verified with `aws-jwt-verify`                                                             |
+| AWS                      | AWS SDK for JavaScript v3: `client-dynamodb` + `lib-dynamodb`, `client-sqs`, `client-sfn`, `client-s3`, `client-athena` |
+| Cache / lock             | Redis (ElastiCache Valkey/Redis in AWS) via `ioredis`                                                                   |
+| Kubernetes               | `@kubernetes/client-node` (reads and fixes the mock system)                                                             |
+| Logging                  | `pino` + `pino-http` (JSON)                                                                                             |
+| IDs                      | ULID (`ulid`)                                                                                                           |
+| Tests                    | **Vitest** + `supertest`; integration tests against docker-compose                                                      |
+| Lint / format            | ESLint (typescript-eslint) + Prettier                                                                                   |
+| Dev / build              | `tsx watch` for dev, `tsc` for build                                                                                    |
+| Container                | Multi-stage Dockerfile, `node:22-alpine`, non-root                                                                      |
+| Local AWS                | **LocalStack** (DynamoDB, S3, SQS, Step Functions) + Redis in docker-compose                                            |
+| CI                       | GitHub Actions                                                                                                          |
 
 ## 5. Commands
 
@@ -117,11 +119,11 @@ oncall-training-backend/
 
 ## 8. Timeline (course)
 
-| Date | Deliverable relevant to this repo |
-|---|---|
+| Date       | Deliverable relevant to this repo                                            |
+| ---------- | ---------------------------------------------------------------------------- |
 | Thu Oct 29 | API + worker running in EKS (namespace `app`), separate from the mock system |
-| Thu Nov 19 | Step Functions + SQS integrated; dashboard served from ElastiCache |
-| Thu Nov 26 | Athena stats endpoints + charts; e2e happy path |
+| Thu Nov 19 | Step Functions + SQS integrated; dashboard served from ElastiCache           |
+| Thu Nov 26 | Athena stats endpoints + charts; e2e happy path                              |
 
 ## 9. Glossary
 
