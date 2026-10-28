@@ -13,31 +13,32 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 ## 1. Decision log
 
-| ID   | Date       | Decision                                                                             | Status                          |
-| ---- | ---------- | ------------------------------------------------------------------------------------ | ------------------------------- |
-| D-01 | 2026-10-22 | Split into three repos: backend, frontend, infra                                     | Decided                         |
-| D-02 | 2026-10-22 | TypeScript (ESM) + Express 5 + pnpm + Vitest                                         | Decided                         |
-| D-03 | 2026-10-22 | Feature modules with factory-function dependency injection                           | Decided                         |
-| D-04 | 2026-10-22 | OpenAPI generated from zod is the frontend contract                                  | Decided                         |
-| D-05 | 2026-10-22 | Only one active session in the whole system (Redis global lock)                      | Decided                         |
-| D-06 | 2026-10-22 | Two processes from one image: `api` and `worker`                                     | Decided                         |
-| D-07 | 2026-10-22 | The worker monitors the mock system and detects resolution                           | Decided                         |
-| D-08 | 2026-10-22 | The worker runs as a single replica                                                  | Decided                         |
-| D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                         | Decided                         |
-| D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                             | Decided                         |
-| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path        | **Proposed** (infra)            |
-| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`        | **Proposed** (infra)            |
-| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                    | **Proposed** (infra)            |
-| D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                           | Decided                         |
-| D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                           | Decided                         |
-| D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404         | Decided                         |
-| D-17 | 2026-10-22 | AWS credentials come from the node role (`LabRole`); no IRSA or Pod Identity         | Decided (forced by Learner Lab) |
-| D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches | Decided                         |
-| D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                          | Decided                         |
-| D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end     | Decided                         |
-| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                 | Decided                         |
-| D-22 | 2026-10-22 | Docs written in English                                                              | Decided                         |
-| D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles          | Decided                         |
+| ID   | Date       | Decision                                                                             | Status                           |
+| ---- | ---------- | ------------------------------------------------------------------------------------ | -------------------------------- |
+| D-01 | 2026-10-22 | Split into three repos: backend, frontend, infra                                     | Decided                          |
+| D-02 | 2026-10-22 | TypeScript (ESM) + Express 5 + pnpm + Vitest                                         | Decided                          |
+| D-03 | 2026-10-22 | Feature modules with factory-function dependency injection                           | Decided                          |
+| D-04 | 2026-10-22 | OpenAPI generated from zod is the frontend contract                                  | Decided                          |
+| D-05 | 2026-10-22 | Only one active session in the whole system (Redis global lock)                      | Decided                          |
+| D-06 | 2026-10-22 | Two processes from one image: `api` and `worker`                                     | Decided                          |
+| D-07 | 2026-10-22 | The worker monitors the mock system and detects resolution                           | Decided                          |
+| D-08 | 2026-10-22 | The worker runs as a single replica                                                  | Decided                          |
+| D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                         | Decided                          |
+| D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                             | Decided                          |
+| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path        | **Proposed** (infra)             |
+| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`        | **Proposed** (infra)             |
+| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                    | **Proposed** (infra)             |
+| D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                           | Decided                          |
+| D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                           | Decided                          |
+| D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404         | Decided                          |
+| D-17 | 2026-10-22 | AWS credentials come from the node role (`LabRole`); no IRSA or Pod Identity         | Decided (forced by Learner Lab)  |
+| D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches | Decided                          |
+| D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                          | Decided                          |
+| D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end     | Decided                          |
+| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                 | Decided                          |
+| D-22 | 2026-10-22 | Docs written in English                                                              | Decided                          |
+| D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles          | Decided                          |
+| D-24 | 2026-10-27 | Nov 5 MVP: direct orchestration, no Redis, dev auth in EKS                           | Decided (temporary until Nov 19) |
 
 ---
 
@@ -151,27 +152,39 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 **Why:** scoring, history and stats must be per user, but the MVP doesn't need profile data. Cognito already stores accounts, so the token's `sub` is a stable `user_id` for DynamoDB keys, Athena filters and Redis keys. The display `username` is copied onto each session for the leaderboard. A users table would only duplicate Cognito.
 **Out of scope:** editing profile data, avatars, settings, roles and admin views.
+
+### D-24 · Nov 5 MVP shortcuts
+
+**Why:** the course added a first rough MVP, due Thu Nov 5, with at least one working flow. Step Functions, ElastiCache and Cognito aren't ready by then (infra D-25), but the incident loop can run without them.
+**What changes until Nov 19:**
+
+- `ORCHESTRATION_MODE=direct` (BE-128): `start` sends `FAULT` to `faults` with a delay for the warmup; `completeTask`/`failTask` write `RESOLVED`/`FAILED` and reset the mock system; the worker handles the timeout.
+- `REDIS_URL` is optional (BE-129): no lock and no event buffer; the dashboard is built on request (BE-130).
+- `AUTH_MODE=dev` is allowed in EKS with `ALLOW_DEV_AUTH=true` (BE-127).
+
+**Kept:** the HTTP API, the session item and the queue messages don't change, so the frontend isn't affected. M2 sets `ORCHESTRATION_MODE=stepfunctions`, adds `REDIS_URL` and turns Cognito on.
 **Future:** if profiles are ever needed, add a `Users` table keyed by `user_id`; existing data doesn't change.
 
 ---
 
 ## 3. Current limitations
 
-| ID   | Limitation                                                         | Impact                                                                       | Mitigation now                                                                           |
-| ---- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| L-01 | Only one session can run at a time                                 | Other users wait (409) up to about 13 min in the worst case                  | `retryAfterSeconds` so the UI can show a countdown                                       |
-| L-02 | All pods share `LabRole`; no per-service IAM permissions           | A compromised pod could reach any AWS resource LabRole allows                | Namespaces, k8s RBAC, NetworkPolicies; no user input reaches AWS calls unvalidated       |
-| L-03 | Session event buffer lives only in Redis until the session ends    | Redis restart mid-session → that session's analytics are lost                | DynamoDB keeps score and key timestamps; ElastiCache restarts are rare                   |
-| L-04 | The global lock lives in Redis                                     | If Redis restarts during a session, a second session could start and collide | Short demo windows; future DynamoDB-based lock (F-02)                                    |
-| L-05 | Single worker replica                                              | Seconds of downtime on restart; actions are delayed, not lost                | Kubernetes restarts it; SQS retains messages; the Step Functions timeout is the backstop |
-| L-06 | Dashboard latency of about 2 s (polling)                           | UI isn't instant                                                             | Acceptable for training                                                                  |
-| L-07 | Athena queries take a few seconds                                  | Stats page loads slowly the first time                                       | 5-min Redis cache; queries filtered by partition                                         |
-| L-08 | Lab credentials expire each session                                | CI deploy secrets must be refreshed manually                                 | Deploy only on demand; CI tests never need AWS                                           |
-| L-09 | One scenario, two fix actions, simple health check (`/health` 2xx) | Limited training value                                                       | Scope is intentional for the MVP                                                         |
-| L-10 | Linear scoring                                                     | Doesn't reward good diagnosis, only speed and accuracy                       | Weights live in the scenario JSON, easy to tune                                          |
-| L-11 | No rate limiting on the API                                        | A user could spam actions                                                    | One session at a time; actions are validated and cheap                                   |
-| L-12 | Leaderboard shows the Cognito `username`                           | If it's an email, it leaks the email                                         | Use a preferred-username or nickname claim (O-04)                                        |
-| L-13 | Mock-system reset after a session can fail                         | Next session would start on a broken system                                  | Worker waits for healthy (60 s) and logs an error; the lock is released anyway           |
+| ID   | Limitation                                                                    | Impact                                                                                       | Mitigation now                                                                           |
+| ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| L-01 | Only one session can run at a time                                            | Other users wait (409) up to about 13 min in the worst case                                  | `retryAfterSeconds` so the UI can show a countdown                                       |
+| L-02 | All pods share `LabRole`; no per-service IAM permissions                      | A compromised pod could reach any AWS resource LabRole allows                                | Namespaces, k8s RBAC, NetworkPolicies; no user input reaches AWS calls unvalidated       |
+| L-03 | Session event buffer lives only in Redis until the session ends               | Redis restart mid-session → that session's analytics are lost                                | DynamoDB keeps score and key timestamps; ElastiCache restarts are rare                   |
+| L-04 | The global lock lives in Redis                                                | If Redis restarts during a session, a second session could start and collide                 | Short demo windows; future DynamoDB-based lock (F-02)                                    |
+| L-05 | Single worker replica                                                         | Seconds of downtime on restart; actions are delayed, not lost                                | Kubernetes restarts it; SQS retains messages; the Step Functions timeout is the backstop |
+| L-06 | Dashboard latency of about 2 s (polling)                                      | UI isn't instant                                                                             | Acceptable for training                                                                  |
+| L-07 | Athena queries take a few seconds                                             | Stats page loads slowly the first time                                                       | 5-min Redis cache; queries filtered by partition                                         |
+| L-08 | Lab credentials expire each session                                           | CI deploy secrets must be refreshed manually                                                 | Deploy only on demand; CI tests never need AWS                                           |
+| L-09 | One scenario, two fix actions, simple health check (`/health` 2xx)            | Limited training value                                                                       | Scope is intentional for the MVP                                                         |
+| L-10 | Linear scoring                                                                | Doesn't reward good diagnosis, only speed and accuracy                                       | Weights live in the scenario JSON, easy to tune                                          |
+| L-11 | No rate limiting on the API                                                   | A user could spam actions                                                                    | One session at a time; actions are validated and cheap                                   |
+| L-12 | Leaderboard shows the Cognito `username`                                      | If it's an email, it leaks the email                                                         | Use a preferred-username or nickname claim (O-04)                                        |
+| L-13 | Mock-system reset after a session can fail                                    | Next session would start on a broken system                                                  | Worker waits for healthy (60 s) and logs an error; the lock is released anyway           |
+| L-14 | Until Nov 19 (MVP, D-24): no global lock, dev auth in EKS, no event log in S3 | Two sessions at once would conflict; any caller can pick a user id; no events for Athena yet | One demo user; ALB limited to the demo IPs (infra INF-138); replaced in M2               |
 
 ---
 

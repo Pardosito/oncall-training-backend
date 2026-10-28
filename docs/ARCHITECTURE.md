@@ -117,6 +117,8 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 
 **Abandon**: `POST /api/sessions/:id/abandon` enqueues `ABANDON`. The worker calls `SendTaskFailure(task_token, "Abandoned")`, and the Step Functions failure branch continues from step 6.
 
+**MVP mode (Nov 5 → Nov 19, DECISIONS D-24):** steps 1–7 run without Step Functions or Redis. There's no lock or task token. The api sends `FAULT` to `FAULTS_QUEUE_URL` itself (delayed by `warmupSeconds`, at most 900 s). The worker detects resolution, writes `RESOLVED` with the score (or `FAILED` on timeout) and resets the mock system. The dashboard is built on each request. See BE-127 to BE-130.
+
 ## 5. Actions catalog (MVP)
 
 | Action               | Where it runs                       | Effect on mock system                                                           | Notes                                                            |
@@ -354,25 +356,28 @@ FIFO queue. `MessageGroupId = sessionId`, `MessageDeduplicationId = actionId`.
 
 ## 9. Configuration (env vars)
 
-| Var                                          | Used by      | Example / default                                                                 |
-| -------------------------------------------- | ------------ | --------------------------------------------------------------------------------- |
-| `NODE_ENV`                                   | both         | `production` \| `development` \| `test`                                           |
-| `PORT` / `WORKER_HEALTH_PORT`                | api / worker | `3000` / `3001`                                                                   |
-| `LOG_LEVEL`                                  | both         | `info`                                                                            |
-| `AWS_REGION`                                 | both         | `us-east-1`                                                                       |
-| `AWS_ENDPOINT_URL`                           | both         | **local only**: `http://localhost:4566`                                           |
-| `SESSIONS_TABLE`                             | both         | `Sessions`                                                                        |
-| `FILES_BUCKET`                               | both         | `oncall-training-files-<acct>`                                                    |
-| `USER_ACTIONS_QUEUE_URL`                     | both         |                                                                                   |
-| `STATE_MACHINE_ARN`                          | api          |                                                                                   |
-| `ATHENA_WORKGROUP` / `ATHENA_DATABASE`       | api          | `oncall-training` / `oncall_training`                                             |
-| `REDIS_URL`                                  | both         | `redis://localhost:6379` (`rediss://` on ElastiCache with TLS)                    |
-| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | api          |                                                                                   |
-| `AUTH_MODE`                                  | api          | `cognito` (default) \| `dev` (**refuses to start unless `NODE_ENV=development`**) |
-| `MOCK_CLUSTER`                               | both         | `kubernetes` (default) \| `fake` (in-memory, for local/frontend dev and tests)    |
-| `MOCK_NAMESPACE`                             | both         | `mock`                                                                            |
-| `MOCK_HEALTH_URL_TEMPLATE`                   | worker       | `http://{service}.mock.svc.cluster.local:8080/health`                             |
-| `STATS_MODE`                                 | api          | `athena` (default) \| `fixture` (local; LocalStack Athena is a paid feature)      |
+| Var                                          | Used by      | Example / default                                                                       |
+| -------------------------------------------- | ------------ | --------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                   | both         | `production` \| `development` \| `test`                                                 |
+| `PORT` / `WORKER_HEALTH_PORT`                | api / worker | `3000` / `3001`                                                                         |
+| `LOG_LEVEL`                                  | both         | `info`                                                                                  |
+| `AWS_REGION`                                 | both         | `us-east-1`                                                                             |
+| `AWS_ENDPOINT_URL`                           | both         | **local only**: `http://localhost:4566`                                                 |
+| `SESSIONS_TABLE`                             | both         | `Sessions`                                                                              |
+| `FILES_BUCKET`                               | both         | `oncall-training-files-<acct>`                                                          |
+| `USER_ACTIONS_QUEUE_URL`                     | both         |                                                                                         |
+| `STATE_MACHINE_ARN`                          | api          |                                                                                         |
+| `ORCHESTRATION_MODE`                         | both         | `stepfunctions` (default) \| `direct` (MVP only, D-24)                                  |
+| `FAULTS_QUEUE_URL`                           | api          | MVP only (`ORCHESTRATION_MODE=direct`)                                                  |
+| `ATHENA_WORKGROUP` / `ATHENA_DATABASE`       | api          | `oncall-training` / `oncall_training`                                                   |
+| `REDIS_URL`                                  | both         | `redis://localhost:6379` (`rediss://` on ElastiCache with TLS); unset in the MVP (D-24) |
+| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | api          |                                                                                         |
+| `AUTH_MODE`                                  | api          | `cognito` (default) \| `dev` (**refuses to start unless `NODE_ENV=development`**)       |
+| `ALLOW_DEV_AUTH`                             | api          | `true` lets `AUTH_MODE=dev` start outside development (MVP only, D-24)                  |
+| `MOCK_CLUSTER`                               | both         | `kubernetes` (default) \| `fake` (in-memory, for local/frontend dev and tests)          |
+| `MOCK_NAMESPACE`                             | both         | `mock`                                                                                  |
+| `MOCK_HEALTH_URL_TEMPLATE`                   | worker       | `http://{service}.mock.svc.cluster.local:8080/health`                                   |
+| `STATS_MODE`                                 | api          | `athena` (default) \| `fixture` (local; LocalStack Athena is a paid feature)            |
 
 ## 10. Local development
 

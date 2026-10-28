@@ -119,11 +119,12 @@ oncall-training-backend/
 
 ## 8. Timeline (course)
 
-| Date       | Deliverable relevant to this repo                                            |
-| ---------- | ---------------------------------------------------------------------------- |
-| Thu Oct 29 | API + worker running in EKS (namespace `app`), separate from the mock system |
-| Thu Nov 19 | Step Functions + SQS integrated; dashboard served from ElastiCache           |
-| Thu Nov 26 | Athena stats endpoints + charts; e2e happy path                              |
+| Date       | Deliverable relevant to this repo                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Thu Oct 29 | API + worker running in EKS (namespace `app`), separate from the mock system                                                              |
+| Thu Nov 5  | **MVP:** one session end to end on EKS (start → fault → fix → resolved) with direct orchestration, no Redis and dev auth (DECISIONS D-24) |
+| Thu Nov 19 | Step Functions + SQS integrated; dashboard served from ElastiCache; the MVP shortcuts replaced                                            |
+| Thu Nov 26 | Athena stats endpoints + charts; e2e happy path                                                                                           |
 
 ## 9. Glossary
 

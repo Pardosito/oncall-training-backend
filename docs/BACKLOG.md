@@ -12,14 +12,15 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Milestones**
 
-| Milestone                   | Goal                                                                             | Due            |
-| --------------------------- | -------------------------------------------------------------------------------- | -------------- |
-| M0 · Bootstrap              | Repo tooling, CI, skeleton                                                       | Tue Oct 27     |
-| M1 · Deployable             | Platform layer, health endpoints, Docker image, api + worker runnable in EKS     | **Thu Oct 29** |
-| M2 · Sessions & actions     | Auth, scenarios, sessions, orchestration, actions, mock-cluster, worker consumer | **Thu Nov 19** |
-| M3 · Dashboard & resolution | Monitor loop, dashboard snapshot, scoring, resolution, cleanup                   | **Thu Nov 19** |
-| M4 · Stats & leaderboard    | Athena stats, leaderboard                                                        | **Thu Nov 26** |
-| M5 · Finish                 | E2E happy path, hardening, docs, demo                                            | **Thu Nov 26** |
+| Milestone                   | Goal                                                                                                              | Due            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------- |
+| M0 · Bootstrap              | Repo tooling, CI, skeleton                                                                                        | Tue Oct 27     |
+| M1 · Deployable             | Platform layer, health endpoints, Docker image, api + worker runnable in EKS                                      | **Thu Oct 29** |
+| MVP · Nov 5                 | One incident loop on EKS: start → fault → fix → resolved, with direct orchestration, no Redis and dev auth (D-24) | **Thu Nov 5**  |
+| M2 · Sessions & actions     | Auth, scenarios, sessions, orchestration, actions, mock-cluster, worker consumer                                  | **Thu Nov 19** |
+| M3 · Dashboard & resolution | Monitor loop, dashboard snapshot, scoring, resolution, cleanup                                                    | **Thu Nov 19** |
+| M4 · Stats & leaderboard    | Athena stats, leaderboard                                                                                         | **Thu Nov 26** |
+| M5 · Finish                 | E2E happy path, hardening, docs, demo                                                                             | **Thu Nov 26** |
 
 **Labels:** type (`chore`, `feat`, `test`, `ci`, `build`, `docs`, `spike`), area (`area:platform`, `area:auth`, `area:scenarios`, `area:sessions`, `area:orchestration`, `area:actions`, `area:mock-cluster`, `area:worker`, `area:events`, `area:dashboard`, `area:scoring`, `area:stats`, `area:leaderboard`, `area:local-dev`), plus `cross-repo` when another repo's owner must agree or act.
 
@@ -422,7 +423,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-039 · feat(openapi): add registry and generator script
 
-**Labels:** `feat` `area:platform` · **Milestone:** M2 · **Depends on:** BE-020
+**Labels:** `feat` `area:platform` · **Milestone:** MVP · **Depends on:** BE-020
 
 **Acceptance criteria**
 
@@ -453,7 +454,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-042 · feat(auth): verify Cognito access tokens and set req.user
 
-**Labels:** `feat` `area:auth` · **Milestone:** M2 · **Depends on:** BE-020
+**Labels:** `feat` `area:auth` · **Milestone:** MVP · **Depends on:** BE-020
 
 **Acceptance criteria**
 
@@ -465,7 +466,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-043 · feat(auth): support dev mode with x-dev-user header
 
-**Labels:** `feat` `area:auth` · **Milestone:** M2 · **Depends on:** BE-042, BE-013
+**Labels:** `feat` `area:auth` · **Milestone:** MVP · **Depends on:** BE-042, BE-013
 
 **Acceptance criteria**
 
@@ -495,7 +496,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-046 · feat(scenarios): define the Scenario zod schema
 
-**Labels:** `feat` `area:scenarios` · **Milestone:** M2 · **Depends on:** BE-012
+**Labels:** `feat` `area:scenarios` · **Milestone:** MVP · **Depends on:** BE-012
 
 **Acceptance criteria**
 
@@ -505,7 +506,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-047 · feat(scenarios): add the orders-down scenario definition
 
-**Labels:** `feat` `area:scenarios` · **Milestone:** M2 · **Depends on:** BE-046
+**Labels:** `feat` `area:scenarios` · **Milestone:** MVP · **Depends on:** BE-046
 
 **Acceptance criteria**
 
@@ -514,7 +515,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-048 · feat(scenarios): load scenarios from S3 with an in-memory cache
 
-**Labels:** `feat` `area:scenarios` · **Milestone:** M2 · **Depends on:** BE-046, BE-022
+**Labels:** `feat` `area:scenarios` · **Milestone:** MVP · **Depends on:** BE-046, BE-022
 
 **Acceptance criteria**
 
@@ -524,7 +525,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-049 · feat(scenarios): add public scenario views (no validFixes)
 
-**Labels:** `feat` `area:scenarios` · **Milestone:** M2 · **Depends on:** BE-046
+**Labels:** `feat` `area:scenarios` · **Milestone:** MVP · **Depends on:** BE-046
 
 **Acceptance criteria**
 
@@ -533,7 +534,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-050 · feat(scenarios): add GET /api/scenarios and GET /api/scenarios/:scenarioId
 
-**Labels:** `feat` `area:scenarios` · **Milestone:** M2 · **Depends on:** BE-048, BE-049, BE-042, BE-039
+**Labels:** `feat` `area:scenarios` · **Milestone:** MVP · **Depends on:** BE-048, BE-049, BE-042, BE-039
 
 **Acceptance criteria**
 
@@ -543,7 +544,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-051 · ci: sync scenarios to S3 in the release workflow
 
-**Labels:** `ci` `area:scenarios` · **Milestone:** M2 · **Depends on:** BE-029, BE-047
+**Labels:** `ci` `area:scenarios` · **Milestone:** MVP · **Depends on:** BE-029, BE-047
 
 **Acceptance criteria**
 
@@ -555,7 +556,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-052 · feat(sessions): define session schemas and the state enum
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-039
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-039
 
 **Acceptance criteria**
 
@@ -564,7 +565,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-053 · feat(sessions): add pure state transition rules
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-052
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-052
 
 **Acceptance criteria**
 
@@ -574,7 +575,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-054 · feat(sessions): add item mapping (toItem / fromItem)
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-052
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-052
 
 **Acceptance criteria**
 
@@ -584,7 +585,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-055 · feat(sessions): repo create with attribute_not_exists
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-054, BE-022
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-054, BE-022
 
 **Acceptance criteria**
 
@@ -593,7 +594,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-056 · feat(sessions): repo get by userId and sessionId
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-055
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-055
 
 **Acceptance criteria**
 
@@ -601,7 +602,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-057 · feat(sessions): repo conditional state transition
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-055, BE-053
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-055, BE-053
 
 **Acceptance criteria**
 
@@ -610,7 +611,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-058 · feat(sessions): repo worker updates (acknowledge, valid fix, counters)
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-055
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-055
 
 **Acceptance criteria**
 
@@ -638,7 +639,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-061 · feat(orchestration): define the Orchestration interface and a fake
 
-**Labels:** `feat` `area:orchestration` · **Milestone:** M2 · **Depends on:** BE-008
+**Labels:** `feat` `area:orchestration` · **Milestone:** MVP · **Depends on:** BE-008
 
 **Acceptance criteria**
 
@@ -687,7 +688,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-066 · feat(sessions): implement startSession in the service
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-055, BE-057, BE-061, BE-064, BE-065, BE-071
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-055, BE-057, BE-061, BE-128, BE-129
 
 **Acceptance criteria**
 
@@ -696,10 +697,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Unknown scenario → 404 before taking the lock.
 - [ ] If put or start fails: mark `FAILED` (best effort), release the lock, rethrow → 500.
 - [ ] Unit tests for each branch with fakes and a fixed clock.
+- [ ] MVP (Nov 5): no lock and no Redis events when `REDIS_URL` is unset (BE-129); `start` goes through direct orchestration (BE-128).
 
 ### BE-067 · feat(sessions): add POST /api/sessions
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-066, BE-042
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-066, BE-042
 
 **Acceptance criteria**
 
@@ -708,7 +710,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-068 · feat(sessions): add GET /api/sessions/:sessionId
 
-**Labels:** `feat` `area:sessions` · **Milestone:** M2 · **Depends on:** BE-056, BE-042
+**Labels:** `feat` `area:sessions` · **Milestone:** MVP · **Depends on:** BE-056, BE-042
 
 **Acceptance criteria**
 
@@ -774,7 +776,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-074 · feat(mock-cluster): define the gateway interface
 
-**Labels:** `feat` `area:mock-cluster` · **Milestone:** M2 · **Depends on:** BE-008
+**Labels:** `feat` `area:mock-cluster` · **Milestone:** MVP · **Depends on:** BE-008
 
 **Acceptance criteria**
 
@@ -783,7 +785,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-075 · feat(mock-cluster): add an in-memory fake cluster
 
-**Labels:** `feat` `area:mock-cluster` · **Milestone:** M2 · **Depends on:** BE-074
+**Labels:** `feat` `area:mock-cluster` · **Milestone:** MVP · **Depends on:** BE-074
 
 **Acceptance criteria**
 
@@ -793,7 +795,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-076 · feat(mock-cluster): list deployments and pods with the k8s client
 
-**Labels:** `feat` `area:mock-cluster` · **Milestone:** M2 · **Depends on:** BE-074, BE-012
+**Labels:** `feat` `area:mock-cluster` · **Milestone:** MVP · **Depends on:** BE-074, BE-012
 
 **Acceptance criteria**
 
@@ -812,7 +814,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-078 · feat(mock-cluster): scale and rollout-restart deployments
 
-**Labels:** `feat` `area:mock-cluster` · **Milestone:** M2 · **Depends on:** BE-076
+**Labels:** `feat` `area:mock-cluster` · **Milestone:** MVP · **Depends on:** BE-076
 
 **Acceptance criteria**
 
@@ -822,7 +824,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-079 · feat(mock-cluster): HTTP health checks with a timeout
 
-**Labels:** `feat` `area:mock-cluster` · **Milestone:** M2 · **Depends on:** BE-074, BE-012
+**Labels:** `feat` `area:mock-cluster` · **Milestone:** MVP · **Depends on:** BE-074, BE-012
 
 **Acceptance criteria**
 
@@ -831,7 +833,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-080 · feat(mock-cluster): select the gateway implementation from config
 
-**Labels:** `feat` `area:mock-cluster` · **Milestone:** M2 · **Depends on:** BE-075, BE-076
+**Labels:** `feat` `area:mock-cluster` · **Milestone:** MVP · **Depends on:** BE-075, BE-076
 
 **Acceptance criteria**
 
@@ -843,7 +845,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-081 · feat(actions): define action request and queue message schemas
 
-**Labels:** `feat` `area:actions` `cross-repo` · **Milestone:** M2 · **Depends on:** BE-052
+**Labels:** `feat` `area:actions` `cross-repo` · **Milestone:** MVP · **Depends on:** BE-052
 
 **Acceptance criteria**
 
@@ -854,7 +856,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-082 · feat(actions): validate an action against the scenario and session state
 
-**Labels:** `feat` `area:actions` · **Milestone:** M2 · **Depends on:** BE-081, BE-046
+**Labels:** `feat` `area:actions` · **Milestone:** MVP · **Depends on:** BE-081, BE-046
 
 **Acceptance criteria**
 
@@ -864,7 +866,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-083 · feat(actions): add pure isValidFix
 
-**Labels:** `feat` `area:actions` · **Milestone:** M2 · **Depends on:** BE-046, BE-081
+**Labels:** `feat` `area:actions` · **Milestone:** MVP · **Depends on:** BE-046, BE-081
 
 **Acceptance criteria**
 
@@ -874,7 +876,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-084 · feat(actions): add the SQS producer for user-actions
 
-**Labels:** `feat` `area:actions` · **Milestone:** M2 · **Depends on:** BE-081, BE-022
+**Labels:** `feat` `area:actions` · **Milestone:** MVP · **Depends on:** BE-081, BE-022
 
 **Acceptance criteria**
 
@@ -883,7 +885,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-085 · feat(actions): add POST /api/sessions/:sessionId/actions
 
-**Labels:** `feat` `area:actions` · **Milestone:** M2 · **Depends on:** BE-082, BE-084, BE-068
+**Labels:** `feat` `area:actions` · **Milestone:** MVP · **Depends on:** BE-082, BE-084, BE-068
 
 **Acceptance criteria**
 
@@ -918,7 +920,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-088 · feat(worker): add the SQS consumer loop
 
-**Labels:** `feat` `area:worker` · **Milestone:** M2 · **Depends on:** BE-081, BE-022, BE-026
+**Labels:** `feat` `area:worker` · **Milestone:** MVP · **Depends on:** BE-081, BE-022, BE-026
 
 **Acceptance criteria**
 
@@ -940,7 +942,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-090 · feat(worker): handle ACKNOWLEDGE
 
-**Labels:** `feat` `area:worker` · **Milestone:** M2 · **Depends on:** BE-088, BE-058, BE-071
+**Labels:** `feat` `area:worker` · **Milestone:** MVP · **Depends on:** BE-088, BE-129
 
 **Acceptance criteria**
 
@@ -948,10 +950,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] If still `STARTING`: record the event but don't set `acknowledged_at` (doesn't count toward TTD).
 - [ ] Counts toward `actions_count`, never toward `wrong_actions`.
 - [ ] Unit tests with a fixed clock.
+- [ ] MVP (Nov 5): no Redis event when `REDIS_URL` is unset (BE-129).
 
 ### BE-091 · feat(worker): handle SCALE_DEPLOYMENT and RESTART_DEPLOYMENT
 
-**Labels:** `feat` `area:worker` · **Milestone:** M2 · **Depends on:** BE-088, BE-078, BE-083, BE-058, BE-071
+**Labels:** `feat` `area:worker` · **Milestone:** MVP · **Depends on:** BE-088, BE-078, BE-129
 
 **Acceptance criteria**
 
@@ -959,6 +962,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Applies via the gateway, then: valid fix → `markValidFix`; otherwise `wrong += 1`; always `actions += 1`.
 - [ ] Appends an `ACTION` event with `valid`.
 - [ ] Unit tests with the fake cluster: valid fix, wrong target, scale below `minReplicas`.
+- [ ] MVP (Nov 5): no Redis event when `REDIS_URL` is unset (BE-129).
 
 ### BE-092 · feat(worker): handle ABANDON
 
@@ -994,7 +998,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-095 · feat(dashboard): define the DashboardSnapshot schema
 
-**Labels:** `feat` `area:dashboard` · **Milestone:** M3 · **Depends on:** BE-052
+**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-052
 
 **Acceptance criteria**
 
@@ -1003,7 +1007,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-096 · feat(dashboard): add the pure snapshot builder
 
-**Labels:** `feat` `area:dashboard` · **Milestone:** M3 · **Depends on:** BE-095, BE-074, BE-072
+**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-095
 
 **Acceptance criteria**
 
@@ -1011,6 +1015,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Health rule: `down` (0 ready or failed check), `degraded` (ready < desired or slow), `healthy`. Document the thresholds.
 - [ ] Only services in `scenario.targets`; `elapsedSeconds` from `fault_injected_at` (or `created_at` before the fault).
 - [ ] Unit tests.
+- [ ] MVP (Nov 5): `recentEvents` come from the session item until the Redis event buffer lands (BE-130).
 
 ### BE-097 · feat(dashboard): store and read snapshots in Redis
 
@@ -1023,7 +1028,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-098 · feat(scoring): compute TTD, TTR and score
 
-**Labels:** `feat` `area:scoring` · **Milestone:** M3 · **Depends on:** BE-046
+**Labels:** `feat` `area:scoring` · **Milestone:** MVP · **Depends on:** BE-046
 
 **Acceptance criteria**
 
@@ -1033,7 +1038,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-099 · feat(dashboard): add the consecutive-healthy resolution detector
 
-**Labels:** `feat` `area:dashboard` · **Milestone:** M3 · **Depends on:** BE-023
+**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-023
 
 **Acceptance criteria**
 
@@ -1043,7 +1048,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-100 · feat(worker): add the monitor loop that writes snapshots
 
-**Labels:** `feat` `area:worker` `area:dashboard` · **Milestone:** M3 · **Depends on:** BE-096, BE-097, BE-064, BE-080
+**Labels:** `feat` `area:worker` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-096, BE-080, BE-129
 
 **Acceptance criteria**
 
@@ -1051,10 +1056,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Needs `userId` to read the session. Decide how the worker gets it from the lock (for example, store `sessionId` and also `session:{id}:owner`, or put `userId:sessionId` in the lock value). Record it in ARCHITECTURE §7.2.
 - [ ] Builds and stores the snapshot; one failing tick is logged and the loop continues.
 - [ ] Unit tests with a fake clock and fakes.
+- [ ] MVP (Nov 5): without Redis, find the active session as in BE-129 and don't store snapshots; the api builds them on request (BE-130).
 
 ### BE-101 · feat(worker): complete the task when the incident is resolved
 
-**Labels:** `feat` `area:worker` `area:scoring` · **Milestone:** M3 · **Depends on:** BE-100, BE-099, BE-098, BE-063
+**Labels:** `feat` `area:worker` `area:scoring` · **Milestone:** MVP · **Depends on:** BE-100, BE-099, BE-098, BE-128
 
 **Acceptance criteria**
 
@@ -1062,6 +1068,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Runs once per session (guard with a Redis flag or the session state) even if the next tick still sees it healthy.
 - [ ] "already-ended" from the orchestration is logged, not retried.
 - [ ] Unit tests.
+- [ ] MVP (Nov 5): `completeTask` is the direct orchestration from BE-128 (writes `RESOLVED` itself, no task token); guard with the session state.
 
 ### BE-102 · feat(worker): handle SESSION_ENDED cleanup
 
@@ -1076,7 +1083,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-103 · feat(dashboard): add GET /api/sessions/:sessionId/dashboard
 
-**Labels:** `feat` `area:dashboard` · **Milestone:** M3 · **Depends on:** BE-097, BE-068
+**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-096, BE-130
 
 **Acceptance criteria**
 
@@ -1084,6 +1091,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Returns the Redis snapshot; if it's missing or older than 10 s, returns the last known one with `stale: true`, or a minimal snapshot built from the DynamoDB item (empty `services`).
 - [ ] Terminal sessions return a minimal final snapshot.
 - [ ] Registered in OpenAPI; supertest tests for fresh, stale and missing.
+- [ ] MVP (Nov 5): without Redis, build the snapshot on request (BE-130).
 
 ### BE-104 · docs: confirm cross-repo proposals D-11, D-12 and D-13 with infra (O-01)
 
@@ -1316,3 +1324,61 @@ So the frontend can build history, stats and leaderboard screens without playing
 
 - [ ] `openapi.json` reviewed with the frontend; every breaking change since the first spec listed in the PR.
 - [ ] Polling contract confirmed (2 s, `stale` flag, `retryAfterSeconds` countdown).
+
+---
+
+## MVP · Nov 5 additions
+
+### BE-127 · feat(config): allow AUTH_MODE=dev in EKS for the Nov 5 MVP
+
+**Labels:** `feat` `area:platform` `area:auth` · **Milestone:** MVP · **Depends on:** BE-013
+
+The Nov 5 MVP has no Cognito (DECISIONS D-24). The api runs in EKS with dev auth until Cognito lands in M2.
+
+**Acceptance criteria**
+
+- [ ] `loadConfig` also accepts `AUTH_MODE=dev` when `ALLOW_DEV_AUTH=true`, whatever `NODE_ENV` is; without it, BE-013's rule still applies.
+- [ ] Logs a warning at startup ("dev auth enabled outside development (MVP)").
+- [ ] Unit tests for the three cases.
+- [ ] Infra stops setting `ALLOW_DEV_AUTH` when Cognito ships in M2.
+
+### BE-128 · feat(orchestration): direct orchestration for the MVP (no Step Functions)
+
+**Labels:** `feat` `area:orchestration` `cross-repo` · **Milestone:** MVP · **Depends on:** BE-061, BE-057, BE-078
+
+The Nov 5 MVP runs without Step Functions (DECISIONS D-24). This implements the same `Orchestration` interface, so M2 only swaps the implementation.
+
+**Acceptance criteria**
+
+- [ ] `ORCHESTRATION_MODE=direct` (default `stepfunctions`) selects `orchestration.direct.ts`.
+- [ ] `start(input)`: sends the `FAULT` message (infra ARCHITECTURE §7) to `FAULTS_QUEUE_URL` with `DelaySeconds = min(warmupSeconds, 900)`, standing in for the `Warmup` state.
+- [ ] `completeTask(output)`: conditional update `INCIDENT_ACTIVE → RESOLVED` with the score fields and `ended_at` (what `PersistResolved` does), then resets the mock system to the scenario baseline.
+- [ ] `failTask`: conditional update to `FAILED` with `failure_reason` and `ended_at`, then the same reset.
+- [ ] The worker marks a session `FAILED` (`TIMEOUT`) once `maxResolveSeconds` pass after `fault_injected_at`.
+- [ ] No task token in this mode; callers don't depend on one.
+- [ ] Unit tests with fakes.
+
+### BE-129 · feat(platform): run without Redis for the MVP
+
+**Labels:** `feat` `area:platform` `area:worker` · **Milestone:** MVP · **Depends on:** BE-023, BE-024
+
+The Nov 5 MVP has no ElastiCache (DECISIONS D-24); one demo user, one session at a time by convention.
+
+**Acceptance criteria**
+
+- [ ] `REDIS_URL` is optional. Unset → no lock, `/readyz` skips the Redis check, events aren't buffered.
+- [ ] The worker finds the active session without the lock (for example a scan for `state IN (STARTING, INCIDENT_ACTIVE)`; the table is tiny in the MVP). Record the choice in ARCHITECTURE.
+- [ ] Unit tests for the no-Redis paths.
+
+### BE-130 · feat(dashboard): build the snapshot on request when Redis is off
+
+**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-096, BE-076, BE-079
+
+The Nov 5 MVP has no Redis snapshot store (DECISIONS D-24).
+
+**Acceptance criteria**
+
+- [ ] Without Redis, `GET /api/sessions/:sessionId/dashboard` builds the `DashboardSnapshot` from the mock-cluster gateway on each request (the api's `mock-reader` RBAC allows it).
+- [ ] `recentEvents` come from the session item timestamps (started, fault injected, acknowledged, resolved).
+- [ ] Same response shape as with Redis, so the frontend doesn't change.
+- [ ] Unit tests.
