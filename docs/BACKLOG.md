@@ -35,9 +35,9 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] The three files are moved to `docs/` with `git mv` (history kept).
-- [ ] All cross-links in `AGENTS.md` and inside the docs resolve.
-- [ ] `BACKLOG.md` moved to `docs/BACKLOG.md`.
+- [x] The three files are moved to `docs/` with `git mv` (history kept).
+- [x] All cross-links in `AGENTS.md` and inside the docs resolve.
+- [x] `BACKLOG.md` moved to `docs/BACKLOG.md`.
 
 ### BE-002 · chore: initialize package.json for pnpm, ESM and Node 22
 
@@ -45,10 +45,10 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] `package.json` with `"type": "module"`, `"engines": { "node": ">=22" }`, `"packageManager": "pnpm@<version>"`, `"private": true`.
-- [ ] `.nvmrc` (or `.node-version`) set to `22`.
-- [ ] `pnpm-lock.yaml` committed.
-- [ ] Only dev tooling installed in this issue (`typescript`, `tsx`, `@types/node`); runtime deps come with the issues that need them.
+- [x] `package.json` with `"type": "module"`, `"engines": { "node": ">=22" }`, `"packageManager": "pnpm@<version>"`, `"private": true`.
+- [x] `.nvmrc` (or `.node-version`) set to `22`.
+- [x] `pnpm-lock.yaml` committed.
+- [x] Only dev tooling installed in this issue (`typescript`, `tsx`, `@types/node`); runtime deps come with the issues that need them.
 
 ### BE-003 · chore: add tsconfig per CONVENTIONS §1
 
@@ -56,9 +56,9 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] `tsconfig.json`: `strict`, `module`/`moduleResolution: NodeNext`, `target: ES2023`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: false`, `outDir: dist`, `rootDir: src`.
-- [ ] `tsconfig.build.json` that excludes `*.test.ts` and `test/`.
-- [ ] `pnpm typecheck` (`tsc --noEmit`) and `pnpm build` (`tsc -p tsconfig.build.json`) scripts.
+- [x] `tsconfig.json`: `strict`, `module`/`moduleResolution: NodeNext`, `target: ES2023`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: false`, `outDir: dist`, `rootDir: src`.
+- [x] `tsconfig.build.json` that excludes `*.test.ts` and `test/`.
+- [x] `pnpm typecheck` (`tsc --noEmit`) and `pnpm build` (`tsc -p tsconfig.build.json`) scripts.
 
 ### BE-004 · chore: configure ESLint with typescript-eslint (type-checked)
 
@@ -66,9 +66,9 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] Flat config `eslint.config.js` using `recommended-type-checked`.
-- [ ] Rules on: `@typescript-eslint/no-floating-promises`, `@typescript-eslint/consistent-type-imports`, `no-console`, `import/no-default-export` (or equivalent).
-- [ ] `pnpm lint` passes on the skeleton.
+- [x] Flat config `eslint.config.js` using `recommended-type-checked`.
+- [x] Rules on: `@typescript-eslint/no-floating-promises`, `@typescript-eslint/consistent-type-imports`, `no-console`, `import/no-default-export` (or equivalent).
+- [x] `pnpm lint` passes on the skeleton.
 
 ### BE-005 · chore: configure Prettier
 
@@ -76,9 +76,9 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] `.prettierrc` with `printWidth: 100`, defaults otherwise; `.prettierignore` covers `dist/`, `openapi/openapi.json`, `pnpm-lock.yaml`.
-- [ ] `eslint-config-prettier` so ESLint and Prettier don't conflict.
-- [ ] `pnpm format` and `pnpm format:check` scripts.
+- [x] `.prettierrc` with `printWidth: 100`, defaults otherwise; `.prettierignore` covers `dist/`, `openapi/openapi.json`, `pnpm-lock.yaml`.
+- [x] `eslint-config-prettier` so ESLint and Prettier don't conflict.
+- [x] `pnpm format` and `pnpm format:check` scripts.
 
 ### BE-006 · chore: configure Vitest with unit and integration projects
 
@@ -86,9 +86,9 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] `pnpm test` runs `src/**/*.test.ts` only (no Docker needed).
-- [ ] `pnpm test:integration` runs `test/integration/**/*.int.test.ts`.
-- [ ] One placeholder test passes in each project.
+- [x] `pnpm test` runs `src/**/*.test.ts` only (no Docker needed).
+- [x] `pnpm test:integration` runs `test/integration/**/*.int.test.ts`.
+- [x] One placeholder test passes in each project.
 
 ### BE-007 · chore: add .gitignore, .editorconfig and .env.example skeleton
 
@@ -96,9 +96,9 @@ Backend scope only. Where an issue depends on another repo, it says so and stops
 
 **Acceptance criteria**
 
-- [ ] `.gitignore` covers `node_modules`, `dist`, `.env`, `.env.*` (but not `.env.example`), coverage, OS files.
-- [ ] `.editorconfig` (2 spaces, LF, final newline).
-- [ ] `.env.example` lists every var in ARCHITECTURE §9 with local defaults and **no secrets**.
+- [x] `.gitignore` covers `node_modules`, `dist`, `.env`, `.env.*` (but not `.env.example`), coverage, OS files.
+- [x] `.editorconfig` (2 spaces, LF, final newline).
+- [x] `.env.example` lists every var in ARCHITECTURE §9 with local defaults and **no secrets**.
 
 ### BE-008 · chore: create source skeleton and entrypoints
 
@@ -108,9 +108,9 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `src/api.ts`, `src/worker.ts`, `src/app.ts` exist with minimal stubs (logging "not implemented" is fine).
-- [ ] Empty folders kept with an `index.ts` per module listed in ARCHITECTURE §3 and `src/platform/`.
-- [ ] `pnpm dev` (`tsx watch src/api.ts`) and `pnpm dev:worker` (`tsx watch src/worker.ts`) scripts start without errors.
+- [x] `src/api.ts`, `src/worker.ts`, `src/app.ts` exist with minimal stubs (logging "not implemented" is fine).
+- [x] Empty folders kept with an `index.ts` per module listed in ARCHITECTURE §3 and `src/platform/`.
+- [x] `pnpm dev` (`tsx watch src/api.ts`) and `pnpm dev:worker` (`tsx watch src/worker.ts`) scripts start without errors.
 
 ### BE-009 · ci: add GitHub Actions workflow for lint, typecheck and unit tests
 
@@ -118,9 +118,9 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `.github/workflows/ci.yml` runs on PRs and pushes to `main`.
-- [ ] Steps: pnpm setup with cache, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`.
-- [ ] No AWS credentials in the workflow.
+- [x] `.github/workflows/ci.yml` runs on PRs and pushes to `main`.
+- [x] Steps: pnpm setup with cache, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`.
+- [x] No AWS credentials in the workflow.
 
 ### BE-010 · chore: add PR and issue templates
 
@@ -128,8 +128,8 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `.github/pull_request_template.md` with the sections from CONVENTIONS §16: what, why, how tested, contract change (frontend/infra action needed?).
-- [ ] A simple issue template (context, acceptance criteria).
+- [x] `.github/pull_request_template.md` with the sections from CONVENTIONS §16: what, why, how tested, contract change (frontend/infra action needed?).
+- [x] A simple issue template (context, acceptance criteria).
 
 ### BE-011 · docs: write README with project summary and quickstart
 
@@ -137,8 +137,8 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] One-paragraph description, link to the other two repos, link to `AGENTS.md` and `docs/`.
-- [ ] Quickstart with the commands from AGENTS §5 (marked "coming soon" where not yet implemented).
+- [x] One-paragraph description, link to the other two repos, link to `AGENTS.md` and `docs/`.
+- [x] Quickstart with the commands from AGENTS §5 (marked "coming soon" where not yet implemented).
 
 ---
 
