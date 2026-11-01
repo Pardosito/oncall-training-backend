@@ -41,7 +41,25 @@ pnpm typecheck                 # TypeScript type check (tsc --noEmit)
 pnpm format:check              # Prettier format check (or pnpm format to format)
 
 # 6. Build & OpenAPI
-# Note: openapi generation is coming soon in M1/M2
-pnpm openapi                   # Regenerate openapi/openapi.json (coming soon)
+pnpm openapi                   # Regenerate openapi/openapi.json (commit it; CI fails if stale)
 pnpm build                     # Compile TypeScript to dist/
 ```
+
+## Docker image and release
+
+One image runs both processes: `node dist/api.js` (default) or `node dist/worker.js`.
+
+```bash
+docker buildx build --platform linux/amd64 -t oncall-backend:local --load .
+docker run --rm --read-only -p 3000:3000 --env-file .env oncall-backend:local
+```
+
+Always build for `linux/amd64`: the EKS nodes are x86_64, and an ARM image crashes there with `exec format error`.
+
+**Pushing to ECR** is done only by the `Release` workflow (Actions → Release → Run workflow):
+
+1. Refresh the Learner Lab credentials. The repo secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` expire with each lab session; the infra repo's `make creds` updates them in all three repos.
+2. Run the workflow on the commit to release. It pushes `oncall-training/backend:<short git sha>` (tags are immutable, never `latest`).
+3. Give infra the tag from the run summary; they roll it out with `make deploy`.
+
+What the infra manifests need (ports, probes, env vars, replicas, RBAC) is in [docs/ARCHITECTURE.md §12](docs/ARCHITECTURE.md#12-deployment-contract-for-the-infra-repos-manifests).

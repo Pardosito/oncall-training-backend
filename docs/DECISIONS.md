@@ -13,32 +13,36 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 ## 1. Decision log
 
-| ID   | Date       | Decision                                                                             | Status                           |
-| ---- | ---------- | ------------------------------------------------------------------------------------ | -------------------------------- |
-| D-01 | 2026-10-22 | Split into three repos: backend, frontend, infra                                     | Decided                          |
-| D-02 | 2026-10-22 | TypeScript (ESM) + Express 5 + pnpm + Vitest                                         | Decided                          |
-| D-03 | 2026-10-22 | Feature modules with factory-function dependency injection                           | Decided                          |
-| D-04 | 2026-10-22 | OpenAPI generated from zod is the frontend contract                                  | Decided                          |
-| D-05 | 2026-10-22 | Only one active session in the whole system (Redis global lock)                      | Decided                          |
-| D-06 | 2026-10-22 | Two processes from one image: `api` and `worker`                                     | Decided                          |
-| D-07 | 2026-10-22 | The worker monitors the mock system and detects resolution                           | Decided                          |
-| D-08 | 2026-10-22 | The worker runs as a single replica                                                  | Decided                          |
-| D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                         | Decided                          |
-| D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                             | Decided                          |
-| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path        | **Proposed** (infra)             |
-| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`        | **Proposed** (infra)             |
-| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                    | **Proposed** (infra)             |
-| D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                           | Decided                          |
-| D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                           | Decided                          |
-| D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404         | Decided                          |
-| D-17 | 2026-10-22 | AWS credentials come from the node role (`LabRole`); no IRSA or Pod Identity         | Decided (forced by Learner Lab)  |
-| D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches | Decided                          |
-| D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                          | Decided                          |
-| D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end     | Decided                          |
-| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                 | Decided                          |
-| D-22 | 2026-10-22 | Docs written in English                                                              | Decided                          |
-| D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles          | Decided                          |
-| D-24 | 2026-10-27 | Nov 5 MVP: direct orchestration, no Redis, dev auth in EKS                           | Decided (temporary until Nov 19) |
+| ID   | Date       | Decision                                                                                                                            | Status                           |
+| ---- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| D-01 | 2026-10-22 | Split into three repos: backend, frontend, infra                                                                                    | Decided                          |
+| D-02 | 2026-10-22 | TypeScript (ESM) + Express 5 + pnpm + Vitest                                                                                        | Decided                          |
+| D-03 | 2026-10-22 | Feature modules with factory-function dependency injection                                                                          | Decided                          |
+| D-04 | 2026-10-22 | OpenAPI generated from zod is the frontend contract                                                                                 | Decided                          |
+| D-05 | 2026-10-22 | Only one active session in the whole system (Redis global lock)                                                                     | Decided                          |
+| D-06 | 2026-10-22 | Two processes from one image: `api` and `worker`                                                                                    | Decided                          |
+| D-07 | 2026-10-22 | The worker monitors the mock system and detects resolution                                                                          | Decided                          |
+| D-08 | 2026-10-22 | The worker runs as a single replica                                                                                                 | Decided                          |
+| D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                                                                        | Decided                          |
+| D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                                                                            | Decided                          |
+| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path                                                       | **Proposed** (infra)             |
+| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`                                                       | **Proposed** (infra)             |
+| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                                                                   | **Proposed** (infra)             |
+| D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                                                                          | Decided                          |
+| D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                                                                          | Decided                          |
+| D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404                                                        | Decided                          |
+| D-17 | 2026-10-22 | AWS credentials come from the node role (`LabRole`); no IRSA or Pod Identity                                                        | Decided (forced by Learner Lab)  |
+| D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches                                                | Decided                          |
+| D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                                                                         | Decided                          |
+| D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end                                                    | Decided                          |
+| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                                                                | Decided                          |
+| D-22 | 2026-10-22 | Docs written in English                                                                                                             | Decided                          |
+| D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles                                                         | Decided                          |
+| D-24 | 2026-10-27 | Nov 5 MVP: direct orchestration, no Redis, dev auth in EKS                                                                          | Decided (temporary until Nov 19) |
+| D-25 | 2026-11-01 | Mode-dependent env vars are optional in the schema and required only by mode                                                        | Decided                          |
+| D-26 | 2026-11-01 | Redis client (BE-023) deferred to M2; `/readyz` checks only DynamoDB and S3 until then                                              | Decided (temporary until Nov 19) |
+| D-27 | 2026-11-01 | One image built for `linux/amd64`, tagged with the short git SHA, pushed only by `release.yml`                                      | Decided                          |
+| D-28 | 2026-11-01 | Contract first: MVP schemas and routes go into `openapi.json` before their handlers; `FAULT` follows infra §7 with a shared fixture | Decided                          |
 
 ---
 
@@ -165,6 +169,28 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 **Kept:** the HTTP API, the session item and the queue messages don't change, so the frontend isn't affected. M2 sets `ORCHESTRATION_MODE=stepfunctions`, adds `REDIS_URL` and turns Cognito on.
 **Future:** if profiles are ever needed, add a `Users` table keyed by `user_id`; existing data doesn't change.
 
+### D-25 · Config requirements depend on the mode
+
+**Why:** infra's `render-config` writes only the outputs that exist. In the Nov 5 MVP there is no Cognito pool, state machine or Athena workgroup, so a schema that required `COGNITO_*`, `STATE_MACHINE_ARN` and `ATHENA_*` would crash the api on EKS.
+**How:** `COGNITO_*` are required only with `AUTH_MODE=cognito`, `STATE_MACHINE_ARN` only with `ORCHESTRATION_MODE=stepfunctions`, `FAULTS_QUEUE_URL` only with `ORCHESTRATION_MODE=direct`, and only for the api process. `ATHENA_WORKGROUP`/`ATHENA_DATABASE` get the infra names as defaults, since those names are fixed. `NODE_ENV` defaults to `production`, so a missing value never enables dev-only behavior.
+**Trade-off:** a misconfigured mode is still caught at startup, but only for the mode actually selected.
+
+### D-26 · Redis client deferred to M2
+
+**Why:** the MVP runs without ElastiCache (D-24). Building the client (BE-023) now, only to make it optional under BE-129, is work with no demo value. `/readyz` checks DynamoDB and S3; the Redis check arrives with the client in M2.
+**Consequence:** BE-099 (resolution detector) keeps its consecutive-healthy counter in worker memory behind an interface (single worker replica, D-08); the Redis implementation comes in M2.
+
+### D-27 · Image platform, tags and who pushes
+
+**Why:** the EKS nodes are x86_64, and an image built on an ARM Mac crashes with `exec format error`. The ECR repository has immutable tags. Infra's `make images` uses the short git SHA for its own images.
+**How:** `release.yml` (manual, after infra's `make creds` refreshes the secrets) builds `linux/amd64` on GitHub's amd64 runners and pushes `oncall-training/backend:<short sha>`. Infra rolls the tag out with `make deploy` (infra D-18). CI builds the image on every PR without pushing.
+
+### D-28 · Contract first, with a shared FAULT fixture
+
+**Why:** the frontend can't generate types (FE-019) until `openapi.json` exists, and the injector rejects any `FAULT` it can't parse. Both would block integration on Nov 3–4 if they waited for the handlers.
+**How:** the MVP schemas (scenarios, sessions, actions, dashboard) and their routes were registered first, and the spec was committed before the handlers. Only MVP routes are in the spec, so it never promises a route that returns 404. For `FAULT`, infra's §7 shape wins over backend §8.1 (it carries `sessionId`, `userId` and `sentAt`). `test/fixtures/fault-message.json` is copied into the infra repo's injector tests, so a change on either side fails a test.
+**Also:** `QueueMessageSchema` accepts `AWAIT_FIX` (infra D-13) now, so an M2 message is never treated as poison.
+
 ---
 
 ## 3. Current limitations
@@ -210,10 +236,10 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 ## 5. Open questions
 
-| ID   | Question                                                                                                                                    | Owner | Blocks             |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------ |
-| O-01 | Infra agrees to D-11, D-12, D-13 and the RBAC in ARCHITECTURE §8.6?                                                                         | Ian   | Week 4 integration |
-| O-02 | Does LocalStack Step Functions support `dynamodb:updateItem.waitForTaskToken`? If not, write a dev orchestrator script                      | JP    | Local full loop    |
-| O-03 | Who rolls out new images to EKS (infra repo workflow vs. `kubectl set image` from this repo's release workflow)?                            | Both  | Week 3 deploy      |
-| O-04 | Which Cognito claim do we show on the leaderboard (`preferred_username`, `nickname`)? Is it in the access token or do we need the ID token? | JP    | Leaderboard        |
-| O-05 | ElastiCache with TLS (`rediss://`) and/or AUTH token in the Learner Lab?                                                                    | Ian   | Redis config       |
+| ID   | Question                                                                                                                                                 | Owner | Blocks             |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------ |
+| O-01 | Infra agrees to D-11, D-12, D-13 and the RBAC in ARCHITECTURE §8.6?                                                                                      | Ian   | Week 4 integration |
+| O-02 | Does LocalStack Step Functions support `dynamodb:updateItem.waitForTaskToken`? If not, write a dev orchestrator script                                   | JP    | Local full loop    |
+| O-03 | ~~Who rolls out new images to EKS?~~ **Answered (2026-11-01):** this repo pushes to ECR (`release.yml`); infra rolls out with `make deploy` (infra D-18) | Both  | —                  |
+| O-04 | Which Cognito claim do we show on the leaderboard (`preferred_username`, `nickname`)? Is it in the access token or do we need the ID token?              | JP    | Leaderboard        |
+| O-05 | ~~ElastiCache with TLS and/or AUTH token?~~ **Answered (2026-11-01):** TLS, no AUTH token (infra D-09) → `REDIS_URL=rediss://<host>:6379`                | Ian   | —                  |

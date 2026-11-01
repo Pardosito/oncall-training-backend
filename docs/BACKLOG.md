@@ -151,10 +151,10 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `src/config/` exports a zod schema covering every var in ARCHITECTURE §9, with defaults and coercion (ports to numbers, enums for `NODE_ENV`, `AUTH_MODE`, `MOCK_CLUSTER`, `STATS_MODE`).
-- [ ] `loadConfig(env)` returns a typed, frozen `Config`; invalid or missing values throw an error listing every failing variable.
-- [ ] Vars needed only by one process (for example `STATE_MACHINE_ARN` for the api) are validated so the worker doesn't need them. Split into `ApiConfig`/`WorkerConfig` or make them optional with a per-process check.
-- [ ] Unit tests: valid env, missing required var, bad enum value.
+- [x] `src/config/` exports a zod schema covering every var in ARCHITECTURE §9, with defaults and coercion (ports to numbers, enums for `NODE_ENV`, `AUTH_MODE`, `MOCK_CLUSTER`, `STATS_MODE`).
+- [x] `loadConfig(env)` returns a typed, frozen `Config`; invalid or missing values throw an error listing every failing variable.
+- [x] Vars needed only by one process (for example `STATE_MACHINE_ARN` for the api) are validated so the worker doesn't need them. Split into `ApiConfig`/`WorkerConfig` or make them optional with a per-process check.
+- [x] Unit tests: valid env, missing required var, bad enum value.
 
 ### BE-013 · feat(config): refuse AUTH_MODE=dev outside development
 
@@ -162,8 +162,8 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `loadConfig` throws when `AUTH_MODE=dev` and `NODE_ENV !== "development"`.
-- [ ] Unit tests for both cases.
+- [x] `loadConfig` throws when `AUTH_MODE=dev` and `NODE_ENV !== "development"`.
+- [x] Unit tests for both cases.
 
 ### BE-014 · feat(platform): add pino logger with redaction
 
@@ -171,10 +171,10 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `src/platform/logger.ts` exports one logger configured from `LOG_LEVEL`, JSON output.
-- [ ] Redacts `req.headers.authorization`, `req.headers.cookie`, and any `taskToken`/`task_token` field.
-- [ ] `pino-pretty` only in development (dev dependency, not in the prod image).
-- [ ] Unit test: a logged object containing an auth header and a task token comes out redacted.
+- [x] `src/platform/logger.ts` exports one logger configured from `LOG_LEVEL`, JSON output.
+- [x] Redacts `req.headers.authorization`, `req.headers.cookie`, and any `taskToken`/`task_token` field.
+- [x] `pino-pretty` only in development (dev dependency, not in the prod image).
+- [x] Unit test: a logged object containing an auth header and a task token comes out redacted.
 
 ### BE-015 · feat(platform): add AppError and error helpers
 
@@ -182,9 +182,9 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `AppError(code, httpStatus, message, details?)` in `src/platform/errors.ts`.
-- [ ] Helpers: `notFound()`, `conflict(code, message, details?)`, `unprocessable(code, message, details?)`, `unavailable()`, `gatewayTimeout(code)`.
-- [ ] Unit tests for each helper's status and code.
+- [x] `AppError(code, httpStatus, message, details?)` in `src/platform/errors.ts`.
+- [x] Helpers: `notFound()`, `conflict(code, message, details?)`, `unprocessable(code, message, details?)`, `unavailable()`, `gatewayTimeout(code)`.
+- [x] Unit tests for each helper's status and code.
 
 ### BE-016 · feat(platform): add Clock abstraction
 
@@ -192,7 +192,7 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `Clock` type (`now(): Date`), `systemClock`, and `createFixedClock(date)` with an `advance(seconds)` helper for tests.
+- [x] `Clock` type (`now(): Date`), `systemClock`, and `createFixedClock(date)` with an `advance(seconds)` helper for tests.
 
 ### BE-017 · feat(http): add request id middleware
 
@@ -200,8 +200,8 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] Generates a ULID per request (or reuses a valid incoming `x-request-id`), stores it on `res.locals.requestId` and sends it back as `x-request-id`.
-- [ ] Unit test with supertest.
+- [x] Generates a ULID per request (or reuses a valid incoming `x-request-id`), stores it on `res.locals.requestId` and sends it back as `x-request-id`.
+- [x] Unit test with supertest.
 
 ### BE-018 · feat(http): add central error handler and 404 handler
 
@@ -209,11 +209,11 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `AppError` → its status and code; `ZodError` → 400 `VALIDATION_ERROR` with issue paths in `details`; anything else → 500 `INTERNAL`.
-- [ ] Body always has the shape in ARCHITECTURE §6, including `requestId`.
-- [ ] No stack traces or upstream messages in the response; the full error is logged.
-- [ ] Unknown routes → 404 `NOT_FOUND` in the same shape.
-- [ ] Unit tests for each mapping.
+- [x] `AppError` → its status and code; `ZodError` → 400 `VALIDATION_ERROR` with issue paths in `details`; anything else → 500 `INTERNAL`.
+- [x] Body always has the shape in ARCHITECTURE §6, including `requestId`.
+- [x] No stack traces or upstream messages in the response; the full error is logged.
+- [x] Unknown routes → 404 `NOT_FOUND` in the same shape.
+- [x] Unit tests for each mapping.
 
 ### BE-019 · feat(http): add zod validate() middleware
 
@@ -221,10 +221,10 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `validate({ params?, query?, body? })` parses with zod and stores the result in `res.locals.input`; never assigns to `req.query` (read-only in Express 5).
-- [ ] Typed helper (`getInput<T>(res)` or similar) so routes read parsed values without casts.
-- [ ] Invalid input → 400 `VALIDATION_ERROR` via the error handler.
-- [ ] Unit tests.
+- [x] `validate({ params?, query?, body? })` parses with zod and stores the result in `res.locals.input`; never assigns to `req.query` (read-only in Express 5).
+- [x] Typed helper (`getInput<T>(res)` or similar) so routes read parsed values without casts.
+- [x] Invalid input → 400 `VALIDATION_ERROR` via the error handler.
+- [x] Unit tests.
 
 ### BE-020 · feat(app): build createApp with the standard middleware order
 
@@ -232,11 +232,11 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `createApp(deps)` in `src/app.ts`, order per CONVENTIONS §4: request id → pino-http → `express.json({ limit: "100kb" })` → health routes → auth → routers → 404 → error handler.
-- [ ] `app.disable("x-powered-by")`, `app.set("trust proxy", 2)`.
-- [ ] **No `cors`**.
-- [ ] pino-http uses the request id and the shared logger.
-- [ ] Unit test: oversize body → 413 in the standard error shape.
+- [x] `createApp(deps)` in `src/app.ts`, order per CONVENTIONS §4: request id → pino-http → `express.json({ limit: "100kb" })` → health routes → auth → routers → 404 → error handler.
+- [x] `app.disable("x-powered-by")`, `app.set("trust proxy", 2)`.
+- [x] **No `cors`**.
+- [x] pino-http uses the request id and the shared logger.
+- [x] Unit test: oversize body → 413 in the standard error shape.
 
 ### BE-021 · feat(health): add GET /healthz
 
@@ -244,8 +244,8 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `GET /healthz` → 200 `{ status: "ok" }`, no dependency checks, no auth.
-- [ ] Supertest unit test.
+- [x] `GET /healthz` → 200 `{ status: "ok" }`, no dependency checks, no auth.
+- [x] Supertest unit test.
 
 ### BE-022 · feat(platform): create AWS SDK client singletons
 
@@ -253,12 +253,14 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `src/platform/aws.ts` creates DynamoDB (+ `DynamoDBDocumentClient` with `removeUndefinedValues: true`), S3, SQS, SFN and Athena clients from config.
-- [ ] `region` from `AWS_REGION`; `endpoint` only when `AWS_ENDPOINT_URL` is set; S3 uses `forcePathStyle` with LocalStack.
-- [ ] **No `credentials` option anywhere** (AGENTS §7.3).
-- [ ] Only the per-service packages are installed (`@aws-sdk/client-*`, `@aws-sdk/lib-dynamodb`).
+- [x] `src/platform/aws.ts` creates DynamoDB (+ `DynamoDBDocumentClient` with `removeUndefinedValues: true`), S3, SQS, SFN and Athena clients from config.
+- [x] `region` from `AWS_REGION`; `endpoint` only when `AWS_ENDPOINT_URL` is set; S3 uses `forcePathStyle` with LocalStack.
+- [x] **No `credentials` option anywhere** (AGENTS §7.3).
+- [x] Only the per-service packages are installed (`@aws-sdk/client-*`, `@aws-sdk/lib-dynamodb`).
 
 ### BE-023 · feat(platform): add Redis client
+
+> **Deferred to M2** (DECISIONS D-26): the Nov 5 MVP has no Redis.
 
 **Labels:** `feat` `area:platform` · **Milestone:** M1 · **Depends on:** BE-012, BE-014
 
@@ -273,10 +275,10 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] Checks DynamoDB (`DescribeTable` on `SESSIONS_TABLE`), Redis (`PING`) and S3 (`HeadBucket` on `FILES_BUCKET`) in parallel, each with a short timeout.
-- [ ] 200 when all pass; 503 with which check failed (no AWS error text).
-- [ ] Checks are injected so unit tests use fakes.
-- [ ] Note in the PR: `DescribeTable` and `HeadBucket` must be allowed for LabRole (they are by default).
+- [x] Checks DynamoDB (`DescribeTable` on `SESSIONS_TABLE`), Redis (`PING`) and S3 (`HeadBucket` on `FILES_BUCKET`) in parallel, each with a short timeout.
+- [x] 200 when all pass; 503 with which check failed (no AWS error text).
+- [x] Checks are injected so unit tests use fakes.
+- [x] Note in the PR: `DescribeTable` and `HeadBucket` must be allowed for LabRole (they are by default).
 
 ### BE-025 · feat(api): wire api.ts entrypoint with graceful shutdown
 
@@ -284,9 +286,9 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `src/api.ts` loads config, builds real deps, calls `createApp`, listens on `PORT`.
-- [ ] On `SIGTERM`/`SIGINT`: stop accepting connections, wait for in-flight requests (bounded), close Redis, exit 0.
-- [ ] Startup and shutdown are logged at info.
+- [x] `src/api.ts` loads config, builds real deps, calls `createApp`, listens on `PORT`.
+- [x] On `SIGTERM`/`SIGINT`: stop accepting connections, wait for in-flight requests (bounded), close Redis, exit 0.
+- [x] Startup and shutdown are logged at info.
 
 ### BE-026 · feat(worker): wire worker.ts entrypoint with health server
 
@@ -294,8 +296,8 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `src/worker.ts` loads config, starts a tiny HTTP server on `WORKER_HEALTH_PORT` with `GET /healthz` (200 while loops are running).
-- [ ] Holds a root `AbortController`; `SIGTERM` aborts it, closes Redis and exits 0 (loops are added later).
+- [x] `src/worker.ts` loads config, starts a tiny HTTP server on `WORKER_HEALTH_PORT` with `GET /healthz` (200 while loops are running).
+- [x] Holds a root `AbortController`; `SIGTERM` aborts it, closes Redis and exits 0 (loops are added later).
 
 ### BE-027 · build: add multi-stage Dockerfile and .dockerignore
 
@@ -303,10 +305,10 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] Stages per CONVENTIONS §15: `deps` (`pnpm fetch`), `build` (`tsc`), `runtime` (`node:22-alpine`, prod deps only, `USER node`).
-- [ ] Default `CMD ["node", "dist/api.js"]`; `node dist/worker.js` works as an override.
-- [ ] `.dockerignore` excludes `node_modules`, `.git`, tests, `.env*`.
-- [ ] Image builds and `/healthz` answers locally with `docker run`.
+- [x] Stages per CONVENTIONS §15: `deps` (`pnpm fetch`), `build` (`tsc`), `runtime` (`node:22-alpine`, prod deps only, `USER node`).
+- [x] Default `CMD ["node", "dist/api.js"]`; `node dist/worker.js` works as an override.
+- [x] `.dockerignore` excludes `node_modules`, `.git`, tests, `.env*`.
+- [x] Image builds and `/healthz` answers locally with `docker run`.
 
 ### BE-028 · ci: build the Docker image in CI
 
@@ -314,7 +316,7 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] CI job runs `docker build` (no push) on every PR.
+- [x] CI job runs `docker build` (no push) on every PR.
 
 ### BE-029 · ci: add release workflow that pushes the image to ECR
 
@@ -322,10 +324,10 @@ Lay out the folders from AGENTS §6 so later issues only add files.
 
 **Acceptance criteria**
 
-- [ ] `.github/workflows/release.yml`, `workflow_dispatch` only (Learner Lab credentials rotate, L-08).
-- [ ] Reads short-lived lab credentials from repo secrets; tags the image with the git SHA; never `latest`.
-- [ ] ECR repository name agreed with infra (infra creates it).
-- [ ] README documents how to refresh the secrets before running it.
+- [x] `.github/workflows/release.yml`, `workflow_dispatch` only (Learner Lab credentials rotate, L-08).
+- [x] Reads short-lived lab credentials from repo secrets; tags the image with the git SHA; never `latest`.
+- [x] ECR repository name agreed with infra (infra creates it).
+- [x] README documents how to refresh the secrets before running it.
 
 ### BE-030 · docs: send infra the deployment contract for api and worker
 
@@ -335,9 +337,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Comment or doc for Ian listing: image name and tag scheme, commands for api and worker, ports, liveness/readiness paths (`/healthz`, `/readyz`, worker `:3001/healthz`), env vars from ARCHITECTURE §9, replica counts (api 2, worker 1), RBAC from ARCHITECTURE §8.6.
-- [ ] Resolve **O-03** (who rolls out images) and record the answer in DECISIONS.
-- [ ] Resolve **O-05** (Redis TLS / AUTH) and confirm `REDIS_URL` format.
+- [x] Comment or doc for Ian listing: image name and tag scheme, commands for api and worker, ports, liveness/readiness paths (`/healthz`, `/readyz`, worker `:3001/healthz`), env vars from ARCHITECTURE §9, replica counts (api 2, worker 1), RBAC from ARCHITECTURE §8.6.
+- [x] Resolve **O-03** (who rolls out images) and record the answer in DECISIONS.
+- [x] Resolve **O-05** (Redis TLS / AUTH) and confirm `REDIS_URL` format.
 
 ---
 
@@ -427,10 +429,10 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `src/openapi/registry.ts` with `extendZodWithOpenApi` and a shared `OpenAPIRegistry`; Bearer auth security scheme registered.
-- [ ] `pnpm openapi` writes `openapi/openapi.json` (stable key order, so diffs are clean).
-- [ ] Health routes and the error body schema registered.
-- [ ] Generated file committed.
+- [x] `src/openapi/registry.ts` with `extendZodWithOpenApi` and a shared `OpenAPIRegistry`; Bearer auth security scheme registered.
+- [x] `pnpm openapi` writes `openapi/openapi.json` (stable key order, so diffs are clean).
+- [x] Health routes and the error body schema registered.
+- [x] Generated file committed.
 
 ### BE-040 · feat(openapi): serve GET /api/openapi.json
 
@@ -438,7 +440,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Route serves the generated document without auth; supertest test.
+- [x] Route serves the generated document without auth; supertest test.
 
 ### BE-041 · ci: fail CI when openapi.json is stale
 
@@ -446,7 +448,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] CI runs `pnpm openapi` then `git diff --exit-code openapi/openapi.json`.
+- [x] CI runs `pnpm openapi` then `git diff --exit-code openapi/openapi.json`.
 
 ---
 
@@ -500,9 +502,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `scenarios.schemas.ts` with `ScenarioSchema` matching ARCHITECTURE §7.5 (action types and fault types as zod enums).
-- [ ] Cross-field refinements: every `baseline` key is in `targets`; every `validFixes[].type` is in `availableActions`; every fix and fault `target` is in `targets`; `SCALE_DEPLOYMENT` fixes have `minReplicas` between 1 and 3.
-- [ ] Unit tests for each refinement.
+- [x] `scenarios.schemas.ts` with `ScenarioSchema` matching ARCHITECTURE §7.5 (action types and fault types as zod enums).
+- [x] Cross-field refinements: every `baseline` key is in `targets`; every `validFixes[].type` is in `availableActions`; every fix and fault `target` is in `targets`; `SCALE_DEPLOYMENT` fixes have `minReplicas` between 1 and 3.
+- [x] Unit tests for each refinement.
 
 ### BE-047 · feat(scenarios): add the orders-down scenario definition
 
@@ -510,8 +512,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `scenarios/orders-down.json` as in ARCHITECTURE §7.5.
-- [ ] Unit test that parses every `scenarios/*.json` with `ScenarioSchema` and checks that the file name equals `id`.
+- [x] `scenarios/orders-down.json` as in ARCHITECTURE §7.5.
+- [x] Unit test that parses every `scenarios/*.json` with `ScenarioSchema` and checks that the file name equals `id`.
 
 ### BE-048 · feat(scenarios): load scenarios from S3 with an in-memory cache
 
@@ -529,8 +531,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `ScenarioSummarySchema` (`id`, `title`, `description`, `maxResolveSeconds`) and `ScenarioPublicSchema` (everything except `validFixes`, `faults` and `scoring` internals that give away the answer). Decide which fields and note them in ARCHITECTURE.
-- [ ] `toSummary` / `toPublic` pure mappers; unit test asserts `validFixes` never appears.
+- [x] `ScenarioSummarySchema` (`id`, `title`, `description`, `maxResolveSeconds`) and `ScenarioPublicSchema` (everything except `validFixes`, `faults` and `scoring` internals that give away the answer). Decide which fields and note them in ARCHITECTURE.
+- [x] `toSummary` / `toPublic` pure mappers; unit test asserts `validFixes` never appears.
 
 ### BE-050 · feat(scenarios): add GET /api/scenarios and GET /api/scenarios/:scenarioId
 
@@ -560,8 +562,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `SessionStateSchema` (`STARTING | INCIDENT_ACTIVE | RESOLVED | FAILED`), domain `Session` type (camelCase), `SessionViewSchema` per ARCHITECTURE §6, `CreateSessionBodySchema`.
-- [ ] Registered in OpenAPI.
+- [x] `SessionStateSchema` (`STARTING | INCIDENT_ACTIVE | RESOLVED | FAILED`), domain `Session` type (camelCase), `SessionViewSchema` per ARCHITECTURE §6, `CreateSessionBodySchema`.
+- [x] Registered in OpenAPI.
 
 ### BE-053 · feat(sessions): add pure state transition rules
 
@@ -569,9 +571,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `canTransition(from, to)` per ARCHITECTURE §4.1: `STARTING→INCIDENT_ACTIVE`, `STARTING→FAILED`, `INCIDENT_ACTIVE→RESOLVED`, `INCIDENT_ACTIVE→FAILED`; terminal states are final.
-- [ ] `isTerminal(state)`.
-- [ ] Unit tests cover the full matrix.
+- [x] `canTransition(from, to)` per ARCHITECTURE §4.1: `STARTING→INCIDENT_ACTIVE`, `STARTING→FAILED`, `INCIDENT_ACTIVE→RESOLVED`, `INCIDENT_ACTIVE→FAILED`; terminal states are final.
+- [x] `isTerminal(state)`.
+- [x] Unit tests cover the full matrix.
 
 ### BE-054 · feat(sessions): add item mapping (toItem / fromItem)
 
@@ -780,8 +782,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `MockClusterGateway`: `listDeployments()`, `listPods()`, `readLogs(service, tailLines)`, `scale(deployment, replicas)`, `restart(deployment)`, `checkHealth(service) → { healthy, latencyMs? }`.
-- [ ] Plain domain types (no k8s client types in the interface).
+- [x] `MockClusterGateway`: `listDeployments()`, `listPods()`, `readLogs(service, tailLines)`, `scale(deployment, replicas)`, `restart(deployment)`, `checkHealth(service) → { healthy, latencyMs? }`.
+- [x] Plain domain types (no k8s client types in the interface).
 
 ### BE-075 · feat(mock-cluster): add an in-memory fake cluster
 
@@ -789,9 +791,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `mock-cluster.fake.ts` starts from a baseline, supports `scale`/`restart`, reports pods and health (a deployment with 0 ready replicas → unhealthy), returns canned log lines.
-- [ ] Exposes `applyFault(fault)` so `dev-inject` and tests can break it.
-- [ ] Unit tests.
+- [x] `mock-cluster.fake.ts` starts from a baseline, supports `scale`/`restart`, reports pods and health (a deployment with 0 ready replicas → unhealthy), returns canned log lines.
+- [x] Exposes `applyFault(fault)` so `dev-inject` and tests can break it.
+- [x] Unit tests.
 
 ### BE-076 · feat(mock-cluster): list deployments and pods with the k8s client
 
@@ -849,10 +851,10 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `ActionRequestSchema` (`type`, `target?`, `params?`); `SCALE_DEPLOYMENT` requires `params.replicas` in 1–3.
-- [ ] `QueueMessageSchema` as a discriminated union on `kind`: `USER` (ARCHITECTURE §8.5) and `SYSTEM`/`SESSION_ENDED` (§8.4).
-- [ ] `SESSION_ENDED` and `ABANDON` can never be sent through `ActionRequestSchema`.
-- [ ] Unit tests: valid and invalid messages of each kind.
+- [x] `ActionRequestSchema` (`type`, `target?`, `params?`); `SCALE_DEPLOYMENT` requires `params.replicas` in 1–3.
+- [x] `QueueMessageSchema` as a discriminated union on `kind`: `USER` (ARCHITECTURE §8.5) and `SYSTEM`/`SESSION_ENDED` (§8.4).
+- [x] `SESSION_ENDED` and `ABANDON` can never be sent through `ActionRequestSchema`.
+- [x] Unit tests: valid and invalid messages of each kind.
 
 ### BE-082 · feat(actions): validate an action against the scenario and session state
 
@@ -860,9 +862,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Pure `checkActionAllowed(scenario, session, action)` per ARCHITECTURE §5: type in `availableActions`, target in `targets`; session must be `INCIDENT_ACTIVE` (except `ACKNOWLEDGE`, also allowed in `STARTING`).
-- [ ] Returns a reason that maps to 422 `ACTION_NOT_ALLOWED` or 409 `SESSION_NOT_ACTIVE`.
-- [ ] Unit tests close to 100% branch coverage.
+- [x] Pure `checkActionAllowed(scenario, session, action)` per ARCHITECTURE §5: type in `availableActions`, target in `targets`; session must be `INCIDENT_ACTIVE` (except `ACKNOWLEDGE`, also allowed in `STARTING`).
+- [x] Returns a reason that maps to 422 `ACTION_NOT_ALLOWED` or 409 `SESSION_NOT_ACTIVE`.
+- [x] Unit tests close to 100% branch coverage.
 
 ### BE-083 · feat(actions): add pure isValidFix
 
@@ -870,9 +872,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Same `type` and `target` as a `validFixes` entry; for scale, `replicas >= minReplicas`.
-- [ ] `isPenalized(action)`: false for `ACKNOWLEDGE` and `VIEW_LOGS`.
-- [ ] Unit tests close to 100%.
+- [x] Same `type` and `target` as a `validFixes` entry; for scale, `replicas >= minReplicas`.
+- [x] `isPenalized(action)`: false for `ACKNOWLEDGE` and `VIEW_LOGS`.
+- [x] Unit tests close to 100%.
 
 ### BE-084 · feat(actions): add the SQS producer for user-actions
 
@@ -1002,8 +1004,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `DashboardSnapshotSchema` per ARCHITECTURE §6, plus optional `stale: boolean`.
-- [ ] Registered in OpenAPI.
+- [x] `DashboardSnapshotSchema` per ARCHITECTURE §6, plus optional `stale: boolean`.
+- [x] Registered in OpenAPI.
 
 ### BE-096 · feat(dashboard): add the pure snapshot builder
 
@@ -1011,11 +1013,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `buildSnapshot({ session, scenario, deployments, pods, health, events, now })` → `DashboardSnapshot`.
-- [ ] Health rule: `down` (0 ready or failed check), `degraded` (ready < desired or slow), `healthy`. Document the thresholds.
-- [ ] Only services in `scenario.targets`; `elapsedSeconds` from `fault_injected_at` (or `created_at` before the fault).
-- [ ] Unit tests.
-- [ ] MVP (Nov 5): `recentEvents` come from the session item until the Redis event buffer lands (BE-130).
+- [x] `buildSnapshot({ session, scenario, deployments, pods, health, events, now })` → `DashboardSnapshot`.
+- [x] Health rule: `down` (0 ready or failed check), `degraded` (ready < desired or slow), `healthy`. Document the thresholds.
+- [x] Only services in `scenario.targets`; `elapsedSeconds` from `fault_injected_at` (or `created_at` before the fault).
+- [x] Unit tests.
+- [x] MVP (Nov 5): `recentEvents` come from the session item until the Redis event buffer lands (BE-130).
 
 ### BE-097 · feat(dashboard): store and read snapshots in Redis
 
@@ -1032,9 +1034,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Pure functions in `scoring/`: `ttdSeconds`, `ttrSeconds` (integer seconds from `fault_injected_at`), `score = max(0, base − perSecondTTD·TTD − perSecondTTR·TTR − perWrongAction·wrong)`.
-- [ ] Never acknowledged → TTD = TTR.
-- [ ] Unit tests close to 100%: zero floor, rounding, missing acknowledge, the example in ARCHITECTURE §8.2.
+- [x] Pure functions in `scoring/`: `ttdSeconds`, `ttrSeconds` (integer seconds from `fault_injected_at`), `score = max(0, base − perSecondTTD·TTD − perSecondTTR·TTR − perWrongAction·wrong)`.
+- [x] Never acknowledged → TTD = TTR.
+- [x] Unit tests close to 100%: zero floor, rounding, missing acknowledge, the example in ARCHITECTURE §8.2.
 
 ### BE-099 · feat(dashboard): add the consecutive-healthy resolution detector
 
@@ -1042,9 +1044,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Pure `isResolved({ state, validFixAppliedAt, allHealthy, consecutiveHealthy })`: `INCIDENT_ACTIVE` + valid fix applied + healthy on 2 consecutive checks (D-07).
-- [ ] Counter stored in `session:{id}:health` (`INCR` on healthy, reset on unhealthy, `EX 3600`).
-- [ ] Unit tests for flapping (healthy, unhealthy, healthy → not resolved).
+- [x] Pure `isResolved({ state, validFixAppliedAt, allHealthy, consecutiveHealthy })`: `INCIDENT_ACTIVE` + valid fix applied + healthy on 2 consecutive checks (D-07).
+- [ ] Counter stored in `session:{id}:health` (`INCR` on healthy, reset on unhealthy, `EX 3600`). _MVP: in-memory `HealthStreakStore` (D-26); the Redis implementation comes with BE-023 in M2._
+- [x] Unit tests for flapping (healthy, unhealthy, healthy → not resolved).
 
 ### BE-100 · feat(worker): add the monitor loop that writes snapshots
 
@@ -1337,10 +1339,10 @@ The Nov 5 MVP has no Cognito (DECISIONS D-24). The api runs in EKS with dev auth
 
 **Acceptance criteria**
 
-- [ ] `loadConfig` also accepts `AUTH_MODE=dev` when `ALLOW_DEV_AUTH=true`, whatever `NODE_ENV` is; without it, BE-013's rule still applies.
-- [ ] Logs a warning at startup ("dev auth enabled outside development (MVP)").
-- [ ] Unit tests for the three cases.
-- [ ] Infra stops setting `ALLOW_DEV_AUTH` when Cognito ships in M2.
+- [x] `loadConfig` also accepts `AUTH_MODE=dev` when `ALLOW_DEV_AUTH=true`, whatever `NODE_ENV` is; without it, BE-013's rule still applies.
+- [x] Logs a warning at startup ("dev auth enabled outside development (MVP)").
+- [x] Unit tests for the three cases.
+- [x] Infra stops setting `ALLOW_DEV_AUTH` when Cognito ships in M2.
 
 ### BE-128 · feat(orchestration): direct orchestration for the MVP (no Step Functions)
 
