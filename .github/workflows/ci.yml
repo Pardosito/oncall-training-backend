@@ -38,3 +38,25 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # linux/amd64 matches the EKS nodes (x86_64). No push: the release workflow does that.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: oncall-training/backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
