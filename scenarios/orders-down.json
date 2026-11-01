@@ -1,0 +1,13 @@
+{
+  "id": "orders-down",
+  "title": "Orders service is not responding",
+  "description": "Checkout requests are failing with 5xx.",
+  "warmupSeconds": 20,
+  "maxResolveSeconds": 600,
+  "targets": ["gateway", "orders", "worker-svc"],
+  "baseline": { "gateway": 1, "orders": 2, "worker-svc": 1 },
+  "faults": [{ "type": "SCALE_TO_ZERO", "target": "orders" }],
+  "availableActions": ["ACKNOWLEDGE", "VIEW_LOGS", "RESTART_DEPLOYMENT", "SCALE_DEPLOYMENT"],
+  "validFixes": [{ "type": "SCALE_DEPLOYMENT", "target": "orders", "minReplicas": 1 }],
+  "scoring": { "base": 1000, "perSecondTTD": 1, "perSecondTTR": 1, "perWrongAction": 25 }
+}

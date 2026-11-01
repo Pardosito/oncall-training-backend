@@ -1,0 +1,1095 @@
+{
+  "components": {
+    "parameters": {},
+    "schemas": {
+      "ActionAccepted": {
+        "properties": {
+          "actionId": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionId"
+        ],
+        "type": "object"
+      },
+      "ActionRequest": {
+        "oneOf": [
+          {
+            "properties": {
+              "type": {
+                "enum": [
+                  "ACKNOWLEDGE"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "target": {
+                "example": "orders",
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "RESTART_DEPLOYMENT"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "target"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "params": {
+                "properties": {
+                  "replicas": {
+                    "maximum": 3,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "replicas"
+                ],
+                "type": "object"
+              },
+              "target": {
+                "example": "orders",
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "SCALE_DEPLOYMENT"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "target",
+              "params"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ActionType": {
+        "enum": [
+          "ACKNOWLEDGE",
+          "VIEW_LOGS",
+          "RESTART_DEPLOYMENT",
+          "SCALE_DEPLOYMENT"
+        ],
+        "type": "string"
+      },
+      "CreateSessionBody": {
+        "properties": {
+          "scenarioId": {
+            "example": "orders-down",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenarioId"
+        ],
+        "type": "object"
+      },
+      "CreateSessionResponse": {
+        "properties": {
+          "sessionId": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "type": "object"
+      },
+      "DashboardSnapshot": {
+        "properties": {
+          "availableActions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionType"
+            },
+            "type": "array"
+          },
+          "elapsedSeconds": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "generatedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "recentEvents": {
+            "items": {
+              "$ref": "#/components/schemas/RecentEvent"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceView"
+            },
+            "type": "array"
+          },
+          "sessionId": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          }
+        },
+        "required": [
+          "sessionId",
+          "state",
+          "generatedAt",
+          "elapsedSeconds",
+          "services",
+          "recentEvents",
+          "availableActions"
+        ],
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "details": {
+                "additionalProperties": {},
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "requestId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "ErrorCode": {
+        "enum": [
+          "VALIDATION_ERROR",
+          "MALFORMED_JSON",
+          "UNAUTHORIZED",
+          "NOT_FOUND",
+          "SESSION_BUSY",
+          "SESSION_NOT_ACTIVE",
+          "PAYLOAD_TOO_LARGE",
+          "UNSUPPORTED_MEDIA_TYPE",
+          "ACTION_NOT_ALLOWED",
+          "INTERNAL",
+          "UNAVAILABLE",
+          "NOT_READY",
+          "STATS_TIMEOUT"
+        ],
+        "type": "string"
+      },
+      "EventType": {
+        "enum": [
+          "SESSION_STARTED",
+          "FAULT_INJECTED",
+          "ACKNOWLEDGED",
+          "ACTION",
+          "VIEW_LOGS",
+          "RESOLVED",
+          "FAILED",
+          "SCORED"
+        ],
+        "type": "string"
+      },
+      "FailureReason": {
+        "enum": [
+          "TIMEOUT",
+          "ABANDONED",
+          "ERROR"
+        ],
+        "type": "string"
+      },
+      "PodView": {
+        "properties": {
+          "ageSeconds": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phase": {
+            "example": "Running",
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "restarts": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "phase",
+          "ready",
+          "restarts",
+          "ageSeconds"
+        ],
+        "type": "object"
+      },
+      "RecentEvent": {
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "ts": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EventType"
+          }
+        },
+        "required": [
+          "ts",
+          "type",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "ScenarioPublic": {
+        "properties": {
+          "availableActions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionType"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "example": "orders-down",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxResolveSeconds": {
+            "type": "integer"
+          },
+          "scoring": {
+            "$ref": "#/components/schemas/ScenarioScoring"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "warmupSeconds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "warmupSeconds",
+          "maxResolveSeconds",
+          "targets",
+          "availableActions",
+          "scoring"
+        ],
+        "type": "object"
+      },
+      "ScenarioScoring": {
+        "properties": {
+          "base": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "perSecondTTD": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "perSecondTTR": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "perWrongAction": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "base",
+          "perSecondTTD",
+          "perSecondTTR",
+          "perWrongAction"
+        ],
+        "type": "object"
+      },
+      "ScenarioSummary": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "example": "orders-down",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxResolveSeconds": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "maxResolveSeconds"
+        ],
+        "type": "object"
+      },
+      "ServiceHealth": {
+        "enum": [
+          "healthy",
+          "degraded",
+          "down"
+        ],
+        "type": "string"
+      },
+      "ServiceView": {
+        "properties": {
+          "desiredReplicas": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "health": {
+            "$ref": "#/components/schemas/ServiceHealth"
+          },
+          "latencyMs": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "example": "orders",
+            "type": "string"
+          },
+          "pods": {
+            "items": {
+              "$ref": "#/components/schemas/PodView"
+            },
+            "type": "array"
+          },
+          "readyReplicas": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "desiredReplicas",
+          "readyReplicas",
+          "health",
+          "pods"
+        ],
+        "type": "object"
+      },
+      "SessionState": {
+        "enum": [
+          "STARTING",
+          "INCIDENT_ACTIVE",
+          "RESOLVED",
+          "FAILED"
+        ],
+        "type": "string"
+      },
+      "SessionView": {
+        "properties": {
+          "acknowledgedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "actionsCount": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "endedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "failureReason": {
+            "$ref": "#/components/schemas/FailureReason"
+          },
+          "faultInjectedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "scenarioId": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "sessionId": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "ttdSeconds": {
+            "type": "integer"
+          },
+          "ttrSeconds": {
+            "type": "integer"
+          },
+          "wrongActions": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionId",
+          "scenarioId",
+          "state",
+          "createdAt"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "Cognito access token. With AUTH_MODE=dev, send `x-dev-user` instead.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Backend of On-Call Training. Generated from the zod schemas (`pnpm openapi`); do not edit by hand.",
+    "title": "On-Call Training API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/openapi.json": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OpenAPI document"
+          }
+        },
+        "summary": "This document",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/scenarios": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScenarioSummary"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Scenario list"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List scenarios",
+        "tags": [
+          "scenarios"
+        ]
+      }
+    },
+    "/api/scenarios/{scenarioId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenarioId",
+            "required": true,
+            "schema": {
+              "example": "orders-down",
+              "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioPublic"
+                }
+              }
+            },
+            "description": "Scenario"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get a scenario (public view, no answer)",
+        "tags": [
+          "scenarios"
+        ]
+      }
+    },
+    "/api/sessions": {
+      "post": {
+        "description": "Starts the scenario for the caller. Returns 409 `SESSION_BUSY` with `details.retryAfterSeconds` while another session holds the global lock (not enforced in the Nov 5 MVP).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSessionResponse"
+                }
+              }
+            },
+            "description": "Session created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "State conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Start a session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Session"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get one of the caller's sessions",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/actions": {
+      "post": {
+        "description": "The worker applies actions in order; the effect shows up in the dashboard once observed (no optimistic updates).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionAccepted"
+                }
+              }
+            },
+            "description": "Action queued"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "State conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Valid shape but not allowed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Queue an action on the mock system",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/dashboard": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSnapshot"
+                }
+              }
+            },
+            "description": "Snapshot"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Live view of the mock system for a session",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "ok"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Alive"
+          }
+        },
+        "summary": "Liveness: the process is up",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "checks": {
+                      "additionalProperties": {
+                        "enum": [
+                          "ok",
+                          "fail"
+                        ],
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "status": {
+                      "enum": [
+                        "ready"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "checks"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Ready"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "A dependency is unavailable (`NOT_READY`, `details.checks`)"
+          }
+        },
+        "summary": "Readiness: DynamoDB and S3 are reachable",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "webhooks": {}
+}

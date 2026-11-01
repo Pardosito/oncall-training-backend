@@ -1,4 +1,5 @@
 import { createApp } from "./app.js";
+import { openApiRouter } from "./openapi/openapi.routes.js";
 import { createAwsClients, createAwsReadinessChecks, destroyAwsClients } from "./platform/aws.js";
 import { bootstrap, closeServer, onShutdownSignal } from "./platform/process.js";
 
@@ -11,6 +12,7 @@ const aws = createAwsClients(config);
 const app = createApp({
   logger,
   readinessChecks: createAwsReadinessChecks(aws, config),
+  publicRouters: [openApiRouter()],
 });
 
 const server = app.listen(config.PORT, () => {

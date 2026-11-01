@@ -39,6 +39,14 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: OpenAPI spec is up to date
+        run: |
+          pnpm openapi
+          git diff --exit-code openapi/openapi.json || {
+            echo "::error::openapi/openapi.json is stale. Run 'pnpm openapi' and commit the result."
+            exit 1
+          }
+
   docker:
     name: Docker build
     runs-on: ubuntu-latest
