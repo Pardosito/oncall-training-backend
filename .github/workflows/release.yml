@@ -1,0 +1,56 @@
+name: Release
+
+# On demand only: Learner Lab credentials rotate every session (DECISIONS L-08).
+# Before running, refresh the AWS_* repo secrets (infra `make creds` updates them in all three repos).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: oncall-training/backend
+
+jobs:
+  image:
+    name: Build and push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Same tag scheme as infra `make images`: the short git SHA, never `latest`.
+      # The ECR repository has immutable tags, so each commit can be pushed once.
+      - name: Compute image tag
+        id: tag
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
+
+      - name: Summary
+        run: |
+          echo "Pushed \`${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Give infra this tag for \`BACKEND_TAG\` in \`k8s/overlays/aws/images.env\` (\`make deploy\`)." >> "$GITHUB_STEP_SUMMARY"

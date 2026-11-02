@@ -1,0 +1,8 @@
+{
+  "faultId": "01JBQ5A7C2D3E4F5G6H7J8K9M0",
+  "sessionId": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+  "userId": "8f1c2b9e-0d4a-4c1e-9b7a-3f2e1d0c9b8a",
+  "type": "SCALE_TO_ZERO",
+  "target": { "namespace": "mock", "deployment": "orders" },
+  "sentAt": "2026-11-05T18:00:20.000Z"
+}

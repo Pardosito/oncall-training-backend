@@ -137,6 +137,8 @@ The API rejects (**422** `ACTION_NOT_ALLOWED`) action types not in `scenario.ava
 
 ## 6. HTTP API
 
+The contract the frontend consumes is `openapi/openapi.json`, generated from the zod schemas with `pnpm openapi` (served at `GET /api/openapi.json`). It lists only routes that exist or ship in the Nov 5 MVP; the rest of this table joins the spec as each route is built (decision D-28).
+
 Base path `/api`. JSON only. All routes except health and `openapi.json` require `Authorization: Bearer <cognito access token>`.
 Sessions are always read with `PK = caller's userId`, so another user's session id returns **404** (we never reveal it exists).
 
@@ -174,7 +176,7 @@ Sessions are always read with `PK = caller's userId`, so another user's session 
 
 ```ts
 SessionView = { sessionId, scenarioId, state, createdAt, faultInjectedAt?, acknowledgedAt?, endedAt?,
-                score?, ttdSeconds?, ttrSeconds?, wrongActions?, failureReason? }
+                score?, ttdSeconds?, ttrSeconds?, wrongActions?, actionsCount?, failureReason? }
 
 DashboardSnapshot = {
   sessionId, state, generatedAt, elapsedSeconds,
@@ -186,6 +188,10 @@ DashboardSnapshot = {
 }
 LeaderboardEntry = { rank, username, score, ttrSeconds, sessionId, endedAt }
 ```
+
+`error.code` is the `ErrorCode` enum in `openapi.json` (`ErrorCodeSchema` in `platform/errors.ts`); a new code is added there before it can be thrown. **Generic error codes** (any route): `VALIDATION_ERROR` (400, zod issues in `details.issues`), `MALFORMED_JSON` (400), `UNAUTHORIZED` (401), `NOT_FOUND` (404, also unknown routes), `PAYLOAD_TOO_LARGE` (413, body over 100 kB), `UNSUPPORTED_MEDIA_TYPE` (415), `INTERNAL` (500), `NOT_READY` (503, `/readyz` only). Every response carries `x-request-id`; a valid ULID sent by the client is reused.
+
+**Snapshot rules** (`dashboard.builder.ts`, BE-096): only the scenario's `targets`, in scenario order. `health` is `down` when no replica is ready or the health check failed or timed out (1.5 s), `degraded` when fewer replicas are ready than desired or the check took over 1 s, otherwise `healthy`. `elapsedSeconds` counts from `faultInjectedAt` (from `createdAt` before the fault) and stops at `endedAt`. `availableActions` depends on the state: `ACKNOWLEDGE` only while `STARTING`, all of the scenario's actions while `INCIDENT_ACTIVE`, none once terminal. In the MVP, `recentEvents` are derived from the session item's timestamps (BE-130).
 
 The SPA polls `GET …/dashboard` every 2 s. If the snapshot is missing or older than 10 s, the API returns the last known one with `stale: true`, or a minimal snapshot built from DynamoDB.
 
@@ -278,6 +284,8 @@ Every line has the same keys (null when not applicable), so the Glue schema stay
 }
 ```
 
+**Public views** (BE-049, `scenarios.views.ts`): `ScenarioSummary` = `id, title, description, maxResolveSeconds`; `ScenarioPublic` = `id, title, description, warmupSeconds, maxResolveSeconds, targets, availableActions, scoring`. `validFixes`, `faults` and `baseline` never leave the backend: they give away the answer. The mappers copy fields one by one, so a new internal field doesn't leak by default.
+
 Score = `max(0, base − perSecondTTD·TTD − perSecondTTR·TTR − perWrongAction·wrong)`. If the user never acknowledged, TTD = TTR.
 
 ## 8. Contracts with other repos (cross-repo)
@@ -297,6 +305,15 @@ Score = `max(0, base − perSecondTTD·TTD − perSecondTTR·TTR − perWrongAct
     "target": { "namespace": "mock", "deployment": "orders" }
   }
 }
+```
+
+### 8.1a `FAULT` message (api → `faults` in the MVP; state machine → `faults` from M2)
+
+The shape is owned by infra (infra ARCHITECTURE §7) and differs from the `fault` field above: it adds `sessionId`, `userId` (the injector's record step needs both, §8.3) and `sentAt`. `FaultMessageSchema` in `modules/orchestration` matches it, and `test/fixtures/fault-message.json` is the shared fixture that both repos' tests parse (decision D-28).
+
+```json
+{ "faultId": "…", "sessionId": "…", "userId": "…", "type": "SCALE_TO_ZERO" | "DELETE_PODS",
+  "target": { "namespace": "mock", "deployment": "orders" }, "sentAt": "…" }
 ```
 
 ### 8.2 `SendTaskSuccess` output (worker → state machine)
@@ -328,6 +345,10 @@ Sent on **every** terminal path (success, timeout, abandon, error):
 
 `MessageGroupId = sessionId`, `MessageDeduplicationId = sessionId + ":ended"`.
 
+### 8.4a `AWAIT_FIX` system message (state machine → `user-actions`, M2)
+
+Infra D-13 replaced the DynamoDB `waitForTaskToken` of §4.2 step 3 with `sqs:sendMessage.waitForTaskToken`: the `WaitForFix` state sends `{ "kind": "SYSTEM", "type": "AWAIT_FIX", "sessionId", "userId", "taskToken" }` (dedup `<sessionId>:await-fix`) and the worker stores the token. `QueueMessageSchema` already accepts it so it never lands in the DLQ; the handler comes with Step Functions in M2. Not sent in the Nov 5 MVP.
+
 ### 8.5 `user-actions` message (api → worker)
 
 FIFO queue. `MessageGroupId = sessionId`, `MessageDeduplicationId = actionId`.
@@ -345,6 +366,8 @@ FIFO queue. `MessageGroupId = sessionId`, `MessageDeduplicationId = actionId`.
 }
 ```
 
+All `user-actions` messages are parsed by `QueueMessageSchema` (`modules/actions`): a union on `kind` (`USER` | `SYSTEM`), then on `type`.
+
 ### 8.6 What the infra repo provides
 
 - Kubernetes RBAC in namespace `mock`:
@@ -356,28 +379,30 @@ FIFO queue. `MessageGroupId = sessionId`, `MessageDeduplicationId = actionId`.
 
 ## 9. Configuration (env vars)
 
-| Var                                          | Used by      | Example / default                                                                       |
-| -------------------------------------------- | ------------ | --------------------------------------------------------------------------------------- |
-| `NODE_ENV`                                   | both         | `production` \| `development` \| `test`                                                 |
-| `PORT` / `WORKER_HEALTH_PORT`                | api / worker | `3000` / `3001`                                                                         |
-| `LOG_LEVEL`                                  | both         | `info`                                                                                  |
-| `AWS_REGION`                                 | both         | `us-east-1`                                                                             |
-| `AWS_ENDPOINT_URL`                           | both         | **local only**: `http://localhost:4566`                                                 |
-| `SESSIONS_TABLE`                             | both         | `Sessions`                                                                              |
-| `FILES_BUCKET`                               | both         | `oncall-training-files-<acct>`                                                          |
-| `USER_ACTIONS_QUEUE_URL`                     | both         |                                                                                         |
-| `STATE_MACHINE_ARN`                          | api          |                                                                                         |
-| `ORCHESTRATION_MODE`                         | both         | `stepfunctions` (default) \| `direct` (MVP only, D-24)                                  |
-| `FAULTS_QUEUE_URL`                           | api          | MVP only (`ORCHESTRATION_MODE=direct`)                                                  |
-| `ATHENA_WORKGROUP` / `ATHENA_DATABASE`       | api          | `oncall-training` / `oncall_training`                                                   |
-| `REDIS_URL`                                  | both         | `redis://localhost:6379` (`rediss://` on ElastiCache with TLS); unset in the MVP (D-24) |
-| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | api          |                                                                                         |
-| `AUTH_MODE`                                  | api          | `cognito` (default) \| `dev` (**refuses to start unless `NODE_ENV=development`**)       |
-| `ALLOW_DEV_AUTH`                             | api          | `true` lets `AUTH_MODE=dev` start outside development (MVP only, D-24)                  |
-| `MOCK_CLUSTER`                               | both         | `kubernetes` (default) \| `fake` (in-memory, for local/frontend dev and tests)          |
-| `MOCK_NAMESPACE`                             | both         | `mock`                                                                                  |
-| `MOCK_HEALTH_URL_TEMPLATE`                   | worker       | `http://{service}.mock.svc.cluster.local:8080/health`                                   |
-| `STATS_MODE`                                 | api          | `athena` (default) \| `fixture` (local; LocalStack Athena is a paid feature)            |
+Parsed once at startup by `src/config/` (`loadConfig(env, "api" | "worker")`). Invalid or missing values exit the process with a list of every failing variable. Empty strings count as unset. Vars marked _conditional_ are optional in the schema and required only in the listed mode, so the Nov 5 MVP (D-24) starts with what infra's `render-config` writes (infra INF-139).
+
+| Var                                          | Used by      | Example / default                                                                                                                                                       |
+| -------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                   | both         | `production` (default; the image sets it too) \| `development` \| `test`                                                                                                |
+| `PORT` / `WORKER_HEALTH_PORT`                | api / worker | `3000` / `3001`                                                                                                                                                         |
+| `LOG_LEVEL`                                  | both         | `info`                                                                                                                                                                  |
+| `AWS_REGION`                                 | both         | `us-east-1` (default)                                                                                                                                                   |
+| `AWS_ENDPOINT_URL`                           | both         | **local only**: `http://localhost:4566`                                                                                                                                 |
+| `SESSIONS_TABLE`                             | both         | `Sessions` (required)                                                                                                                                                   |
+| `FILES_BUCKET`                               | both         | `oncall-training-files-<acct>` (required)                                                                                                                               |
+| `USER_ACTIONS_QUEUE_URL`                     | both         | required                                                                                                                                                                |
+| `ORCHESTRATION_MODE`                         | both         | `stepfunctions` (default) \| `direct` (MVP only, D-24)                                                                                                                  |
+| `STATE_MACHINE_ARN`                          | api          | _conditional_: required when `ORCHESTRATION_MODE=stepfunctions`                                                                                                         |
+| `FAULTS_QUEUE_URL`                           | api          | _conditional_: required when `ORCHESTRATION_MODE=direct`                                                                                                                |
+| `ATHENA_WORKGROUP` / `ATHENA_DATABASE`       | api          | `oncall-training` / `oncall_training` (defaults: the names are fixed by infra, so the MVP needs no value)                                                               |
+| `REDIS_URL`                                  | both         | optional. `redis://localhost:6379`, or `rediss://…:6379` on ElastiCache (TLS, no AUTH token, infra D-09); unset in the MVP                                              |
+| `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | api          | _conditional_: required when `AUTH_MODE=cognito`                                                                                                                        |
+| `AUTH_MODE`                                  | api          | `cognito` (default) \| `dev` (**refuses to start unless `NODE_ENV=development` or `ALLOW_DEV_AUTH=true`**)                                                              |
+| `ALLOW_DEV_AUTH`                             | api          | `false` (default). `true` lets `AUTH_MODE=dev` start outside development and logs a warning (MVP only, D-24)                                                            |
+| `MOCK_CLUSTER`                               | both         | `kubernetes` (default) \| `fake` (in-memory, for local/frontend dev and tests)                                                                                          |
+| `MOCK_NAMESPACE`                             | both         | `mock` (default)                                                                                                                                                        |
+| `MOCK_HEALTH_URL_TEMPLATE`                   | both         | `http://{service}.mock.svc.cluster.local:8080/health` (default; must contain `{service}`). The api uses it too in the MVP: it builds the dashboard per request (BE-130) |
+| `STATS_MODE`                                 | api          | `athena` (default) \| `fixture` (local; LocalStack Athena is a paid feature)                                                                                            |
 
 ## 10. Local development
 
@@ -403,3 +428,26 @@ Ways to run, from least to most realistic:
 | Redis restart                           | Dashboard rebuilds within 2 s; **lock and unflushed events are lost** (see limitations)                                        |
 | Athena slow                             | Poll up to 20 s, then 504 `STATS_TIMEOUT`; cached results are served if present                                                |
 | `SendTaskSuccess` with an expired token | `TaskTimedOut` is caught and logged; the session is already `FAILED`                                                           |
+
+## 12. Deployment contract (for the infra repo's manifests)
+
+What infra needs to run this repo on EKS (BE-030). The manifests live in the infra repo (infra D-01); image rollouts happen there too (`make deploy`, infra D-18, which answers O-03).
+
+| Item           | `backend-api`                                                                   | `backend-worker`                                     |
+| -------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Image          | `<acct>.dkr.ecr.us-east-1.amazonaws.com/oncall-training/backend:<tag>`          | same image                                           |
+| Tag            | short git SHA from `release.yml` (`git rev-parse --short HEAD`); never `latest` | same tag                                             |
+| Command        | default (`node dist/api.js`)                                                    | `node dist/worker.js`                                |
+| Port           | 3000 (HTTP)                                                                     | 3001 (health only)                                   |
+| Liveness       | `GET /healthz`                                                                  | `GET :3001/healthz`                                  |
+| Readiness      | `GET /readyz` (DynamoDB `DescribeTable` + S3 `HeadBucket`)                      | `GET :3001/healthz`                                  |
+| Replicas       | 2                                                                               | **1**, strategy `Recreate` (D-08)                    |
+| ServiceAccount | `app/backend-api`, `mock-reader` Role in `mock` (§8.6)                          | `app/backend-worker`, `mock-operator` Role in `mock` |
+| Env            | ConfigMap `oncall-config` with the §9 vars                                      | same ConfigMap                                       |
+| Shutdown       | drains in-flight requests for up to 10 s after `SIGTERM`                        | aborts its loops, then exits 0                       |
+
+- **Platform:** `linux/amd64` (the nodes are x86_64). The release workflow builds on amd64 runners; never push an image built on an ARM Mac without `--platform linux/amd64`.
+- **Security context:** runs as the image's `node` user (uid 1000), writes nothing to disk, so `readOnlyRootFilesystem: true` and `runAsNonRoot: true` work. Verified with `docker run --read-only`.
+- **Credentials:** none in the pod spec. The SDK uses the node's LabRole through IMDS (hop limit 2, infra D-05).
+- **Nov 5 MVP values** (infra INF-139): `AUTH_MODE=dev`, `ALLOW_DEV_AUTH=true`, `ORCHESTRATION_MODE=direct`, `FAULTS_QUEUE_URL`; no `REDIS_URL`, `STATE_MACHINE_ARN` or `COGNITO_*`. `NODE_ENV` comes from the image.
+- **Release:** refresh the lab secrets (infra `make creds` updates them in this repo), run the `Release` workflow, then give infra the tag for `BACKEND_TAG`.
