@@ -19,7 +19,8 @@
     "test:integration": "vitest run --project integration",
     "openapi": "tsx src/openapi/generate.ts",
     "dev:local": "tsx watch --env-file-if-exists=.env src/dev-local.ts",
-    "dev:memory": "tsx watch --env-file-if-exists=.env src/dev-local.ts --in-memory"
+    "dev:memory": "tsx watch --env-file-if-exists=.env src/dev-local.ts --in-memory",
+    "test:scenarios": "vitest run --project unit src/modules/scenarios"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
