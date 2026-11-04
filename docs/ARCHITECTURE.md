@@ -464,4 +464,4 @@ What infra needs to run this repo on EKS (BE-030). The manifests live in the inf
 - **Security context:** runs as the image's `node` user (uid 1000), writes nothing to disk, so `readOnlyRootFilesystem: true` and `runAsNonRoot: true` work. Verified with `docker run --read-only`.
 - **Credentials:** none in the pod spec. The SDK uses the node's LabRole through IMDS (hop limit 2, infra D-05).
 - **Nov 5 MVP values** (infra INF-139): `AUTH_MODE=dev`, `ALLOW_DEV_AUTH=true`, `ORCHESTRATION_MODE=direct`, `FAULTS_QUEUE_URL`; no `REDIS_URL`, `STATE_MACHINE_ARN` or `COGNITO_*`. `NODE_ENV` comes from the image.
-- **Release:** refresh the lab secrets (infra `make creds` updates them in this repo), run the `Release` workflow, then give infra the tag for `BACKEND_TAG`.
+- **Release:** refresh the lab secrets (infra `make creds` updates them in this repo), then run the `Release` workflow. It syncs `scenarios/` to the files bucket (BE-051) and pushes the image. Then give infra the tag for `BACKEND_TAG`. Api pods cache scenarios, so restart them after a scenario-only change.

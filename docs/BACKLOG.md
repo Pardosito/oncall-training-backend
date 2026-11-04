@@ -359,7 +359,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-032 · chore(local): init script that creates the Sessions table and Leaderboard GSI
 
-**Labels:** `chore` `area:local-dev` · **Milestone:** M1 · **Depends on:** BE-031
+**Labels:** `chore` `area:local-dev` · **Milestone:** M2 · **Depends on:** BE-031
 
 **Acceptance criteria**
 
@@ -554,7 +554,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Release workflow validates scenarios (the unit test) and then `aws s3 sync scenarios/ s3://$FILES_BUCKET/scenarios/` (manual trigger, same credentials as the image push).
+- [x] Release workflow validates scenarios (the unit test) and then `aws s3 sync scenarios/ s3://$FILES_BUCKET/scenarios/` (manual trigger, same credentials as the image push).
 
 ---
 
@@ -645,7 +645,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-061 · feat(orchestration): define the Orchestration interface and a fake
 
-**Labels:** `feat` `area:orchestration` · **Milestone:** MVP · **Depends on:** BE-008
+**Labels:** `feat` `area:orchestration` · **Milestone:** M2 · **Depends on:** BE-008
 
 **Acceptance criteria**
 
@@ -954,7 +954,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-090 · feat(worker): handle ACKNOWLEDGE
 
-**Labels:** `feat` `area:worker` · **Milestone:** MVP · **Depends on:** BE-088, BE-129
+**Labels:** `feat` `area:worker` · **Milestone:** M2 · **Depends on:** BE-088, BE-129
 
 **Acceptance criteria**
 
@@ -966,7 +966,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-091 · feat(worker): handle SCALE_DEPLOYMENT and RESTART_DEPLOYMENT
 
-**Labels:** `feat` `area:worker` · **Milestone:** MVP · **Depends on:** BE-088, BE-078, BE-129
+**Labels:** `feat` `area:worker` · **Milestone:** M2 · **Depends on:** BE-088, BE-078, BE-129
 
 **Acceptance criteria**
 
@@ -1054,7 +1054,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-099 · feat(dashboard): add the consecutive-healthy resolution detector
 
-**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-023
+**Labels:** `feat` `area:dashboard` · **Milestone:** M2 · **Depends on:** BE-023
 
 **Acceptance criteria**
 
@@ -1064,7 +1064,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-100 · feat(worker): add the monitor loop that writes snapshots
 
-**Labels:** `feat` `area:worker` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-096, BE-080, BE-129
+**Labels:** `feat` `area:worker` `area:dashboard` · **Milestone:** M2 · **Depends on:** BE-096, BE-080, BE-129
 
 **Acceptance criteria**
 
@@ -1078,7 +1078,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-101 · feat(worker): complete the task when the incident is resolved
 
-**Labels:** `feat` `area:worker` `area:scoring` · **Milestone:** MVP · **Depends on:** BE-100, BE-099, BE-098, BE-128
+**Labels:** `feat` `area:worker` `area:scoring` · **Milestone:** M2 · **Depends on:** BE-100, BE-099, BE-098, BE-128
 
 **Acceptance criteria**
 
@@ -1103,7 +1103,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 ### BE-103 · feat(dashboard): add GET /api/sessions/:sessionId/dashboard
 
-**Labels:** `feat` `area:dashboard` · **Milestone:** MVP · **Depends on:** BE-096, BE-130
+**Labels:** `feat` `area:dashboard` · **Milestone:** M2 · **Depends on:** BE-096, BE-130
 
 **Acceptance criteria**
 

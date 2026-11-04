@@ -63,7 +63,9 @@ Always build for `linux/amd64`: the EKS nodes are x86_64, and an ARM image crash
 **Pushing to ECR** is done only by the `Release` workflow (Actions → Release → Run workflow):
 
 1. Refresh the Learner Lab credentials. The repo secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` expire with each lab session; the infra repo's `make creds` updates them in all three repos.
-2. Run the workflow on the commit to release. It pushes `oncall-training/backend:<short git sha>` (tags are immutable, never `latest`).
+2. Run the workflow on the commit to release. It runs two jobs:
+   - It validates `scenarios/*.json` and syncs them to `s3://oncall-training-files-<account>/scenarios/` (the api reads them from there and caches them per pod, so restart running api pods after a scenario change).
+   - It pushes `oncall-training/backend:<short git sha>` (tags are immutable, never `latest`).
 3. Give infra the tag from the run summary; they roll it out with `make deploy`.
 
 What the infra manifests need (ports, probes, env vars, replicas, RBAC) is in [docs/ARCHITECTURE.md §12](docs/ARCHITECTURE.md#12-deployment-contract-for-the-infra-repos-manifests).

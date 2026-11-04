@@ -13,6 +13,53 @@ env:
   ECR_REPOSITORY: oncall-training/backend
 
 jobs:
+  # BE-051 (D-19): scenarios/ is the source of truth. The api reads s3://<bucket>/scenarios/ and
+  # caches it per process, so run this before (or together with) a rollout.
+  scenarios:
+    name: Validate and sync scenarios to S3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Nothing reaches S3 unless every file passes ScenarioSchema (the api would skip it anyway).
+      - name: Validate scenarios
+        run: pnpm test:scenarios
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      # Bucket name fixed by infra Terraform: oncall-training-files-<account id> (ARCHITECTURE §7.3).
+      # --delete keeps S3 identical to the repo; only *.json is synced.
+      - name: Sync scenarios/ to S3
+        run: |
+          account="$(aws sts get-caller-identity --query Account --output text)"
+          bucket="oncall-training-files-${account}"
+          aws s3 sync scenarios/ "s3://${bucket}/scenarios/" --delete --exclude "*" --include "*.json"
+          {
+            echo "Synced scenarios to \`s3://${bucket}/scenarios/\`:"
+            aws s3 ls "s3://${bucket}/scenarios/" | sed 's/^/    /'
+            echo "Running api pods cache scenarios: restart them (\`kubectl -n app rollout restart deploy/backend-api\`) if they were already up."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   image:
     name: Build and push to ECR
     runs-on: ubuntu-latest
