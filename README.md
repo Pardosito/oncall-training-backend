@@ -23,13 +23,17 @@ This repository hosts the **API** (Express HTTP server) and the **worker** (cons
 # 1. Install dependencies
 pnpm install
 
-# 2. Local environment (LocalStack + Redis)
-# Note: docker-compose configuration is coming soon in M1
-docker compose up -d
+# 2a. Whole MVP loop with no Docker (api + worker + fake injector, in memory)
+pnpm dev:memory                # API on :3000; send `x-dev-user: <id>[:<name>]`
 
-# 3. Start development servers
-pnpm dev                       # API on :3000 (tsx watch)
-pnpm dev:worker                # Worker on :3001 (tsx watch)
+# 2b. Same loop on LocalStack (DynamoDB, S3, SQS seeded by local/init)
+cp .env.example .env
+docker compose up -d --wait
+pnpm dev:local
+
+# 3. Separate processes (MOCK_CLUSTER=kubernetes against kind, like EKS)
+pnpm dev                       # API on :3000 (tsx watch, loads .env)
+pnpm dev:worker                # Worker, health on :3001
 
 # 4. Testing
 pnpm test                      # Unit tests (Vitest, no Docker required)

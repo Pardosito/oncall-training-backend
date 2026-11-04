@@ -245,6 +245,24 @@
         ],
         "type": "string"
       },
+      "LogsResponse": {
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "service": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "lines"
+        ],
+        "type": "object"
+      },
       "PodView": {
         "properties": {
           "ageSeconds": {
@@ -817,6 +835,94 @@
         ]
       }
     },
+    "/api/sessions/{sessionId}/abandon": {
+      "post": {
+        "description": "Queues `ABANDON`; the worker ends the session as `FAILED` with `failureReason: ABANDONED`. 409 `SESSION_NOT_ACTIVE` once it has ended.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionAccepted"
+                }
+              }
+            },
+            "description": "Abandon queued"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "State conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Give up on the session",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
     "/api/sessions/{sessionId}/actions": {
       "post": {
         "description": "The worker applies actions in order; the effect shows up in the dashboard once observed (no optimistic updates).",
@@ -999,6 +1105,114 @@
         "summary": "Live view of the mock system for a session",
         "tags": [
           "dashboard"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/logs": {
+      "get": {
+        "description": "Synchronous, not queued (D-15). `service` must be one of the scenario's targets (422) and the session `INCIDENT_ACTIVE` (409).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "example": "orders",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogsResponse"
+                }
+              }
+            },
+            "description": "Log lines, oldest first"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "State conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Valid shape but not allowed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Last 100 log lines of one of the scenario's services (VIEW_LOGS)",
+        "tags": [
+          "actions"
         ]
       }
     },

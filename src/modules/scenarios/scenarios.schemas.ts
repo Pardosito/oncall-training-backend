@@ -50,7 +50,7 @@ export const ScenarioSchema = z
     warmupSeconds: z.int().min(0),
     maxResolveSeconds: z.int().positive(),
     targets: z.array(DeploymentNameSchema).min(1),
-    baseline: z.record(DeploymentNameSchema, z.int().min(0).max(MAX_REPLICAS)),
+    baseline: z.record(DeploymentNameSchema, ReplicasSchema),
     faults: z.array(z.object({ type: FaultTypeSchema, target: DeploymentNameSchema })).min(1),
     availableActions: z.array(ActionTypeSchema).min(1),
     validFixes: z.array(ValidFixSchema).min(1),

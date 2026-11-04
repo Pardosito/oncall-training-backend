@@ -1,0 +1,30 @@
+# Local AWS stand-ins for the backend (ARCHITECTURE §10). `docker compose up -d`, then `pnpm dev:local`.
+# LocalStack is pinned: `latest` needs a LOCALSTACK_AUTH_TOKEN (D-31).
+services:
+  localstack:
+    image: localstack/localstack:4.4
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: dynamodb,s3,sqs
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ./local/init/ready.d:/etc/localstack/init/ready.d:ro
+      - ./scenarios:/scenarios:ro
+    healthcheck:
+      # Healthy only once the init script has created every resource.
+      test: ["CMD", "test", "-f", "/tmp/oncall-ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  # Not used by the Nov 5 MVP (D-24/D-26); here so M2 work can start without editing compose.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

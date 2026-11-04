@@ -22,3 +22,8 @@ export {
   REQUIRED_HEALTHY_CHECKS,
 } from "./resolution.js";
 export type { HealthStreakStore } from "./resolution.js";
+export { allServicesUp, observeMockSystem } from "./dashboard.observe.js";
+export type { MockSystemObservation } from "./dashboard.observe.js";
+export { createDashboardService } from "./dashboard.service.js";
+export type { DashboardService } from "./dashboard.service.js";
+export { dashboardRouter } from "./dashboard.routes.js";

@@ -75,6 +75,14 @@ export const QueueMessageSchema = z.discriminatedUnion("kind", [
 ]);
 export type QueueMessage = z.infer<typeof QueueMessageSchema>;
 
+export const LOG_TAIL_LINES = 100;
+
+export const LogsQuerySchema = z.object({ service: TargetSchema });
+export const LogsResponseSchema = z
+  .object({ service: z.string(), lines: z.array(z.string()) })
+  .meta({ id: "LogsResponse" });
+export type LogsResponse = z.infer<typeof LogsResponseSchema>;
+
 export function registerActionsOpenApi(registry: OpenAPIRegistry): void {
   registry.registerPath({
     method: "post",
@@ -91,6 +99,34 @@ export function registerActionsOpenApi(registry: OpenAPIRegistry): void {
     responses: {
       202: { description: "Action queued", ...jsonContent(ActionAcceptedResponseSchema) },
       ...errorResponses(400, 401, 404, 409, 422),
+    },
+  });
+  registry.registerPath({
+    method: "get",
+    path: "/api/sessions/{sessionId}/logs",
+    tags: ["actions"],
+    summary: "Last 100 log lines of one of the scenario's services (VIEW_LOGS)",
+    description:
+      "Synchronous, not queued (D-15). `service` must be one of the scenario's targets (422) and the session `INCIDENT_ACTIVE` (409).",
+    security: [{ [BEARER_AUTH]: [] }],
+    request: { params: SessionParamsSchema, query: LogsQuerySchema },
+    responses: {
+      200: { description: "Log lines, oldest first", ...jsonContent(LogsResponseSchema) },
+      ...errorResponses(400, 401, 404, 409, 422),
+    },
+  });
+  registry.registerPath({
+    method: "post",
+    path: "/api/sessions/{sessionId}/abandon",
+    tags: ["actions"],
+    summary: "Give up on the session",
+    description:
+      "Queues `ABANDON`; the worker ends the session as `FAILED` with `failureReason: ABANDONED`. 409 `SESSION_NOT_ACTIVE` once it has ended.",
+    security: [{ [BEARER_AUTH]: [] }],
+    request: { params: SessionParamsSchema },
+    responses: {
+      202: { description: "Abandon queued", ...jsonContent(ActionAcceptedResponseSchema) },
+      ...errorResponses(400, 401, 404, 409),
     },
   });
 }

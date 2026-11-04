@@ -351,9 +351,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `docker-compose.yml` with LocalStack (`SERVICES=dynamodb,s3,sqs,stepfunctions`) on 4566 and Redis on 6379, both with healthchecks.
-- [ ] `local/init/` mounted as LocalStack ready hooks (`/etc/localstack/init/ready.d`).
-- [ ] `.env.example` defaults point at these (`AWS_ENDPOINT_URL=http://localhost:4566`, dummy keys).
+- [x] `docker-compose.yml` with LocalStack (`SERVICES=dynamodb,s3,sqs,stepfunctions`) on 4566 and Redis on 6379, both with healthchecks.
+- [x] `local/init/` mounted as LocalStack ready hooks (`/etc/localstack/init/ready.d`).
+- [x] `.env.example` defaults point at these (`AWS_ENDPOINT_URL=http://localhost:4566`, dummy keys).
+
+> **MVP status (2026-11-02):** LocalStack 4.4 (pinned, D-31) with `dynamodb,s3,sqs`; `stepfunctions` joins with BE-036 in M2.
 
 ### BE-032 · chore(local): init script that creates the Sessions table and Leaderboard GSI
 
@@ -361,8 +363,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Table `Sessions`: PK `user_id` (S), SK `session_id` (S); GSI `Leaderboard` PK `scenario_id` (S), SK `score` (N); on-demand billing.
-- [ ] Idempotent (safe to re-run).
+- [x] Table `Sessions`: PK `user_id` (S), SK `session_id` (S); GSI `Leaderboard` PK `scenario_id` (S), SK `score` (N); on-demand billing.
+- [x] Idempotent (safe to re-run).
 - [ ] Shape matches what infra's Terraform creates (confirm with Ian; `cross-repo`).
 
 ### BE-033 · chore(local): init script that creates the files bucket
@@ -371,7 +373,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Creates `FILES_BUCKET` and uploads `scenarios/*.json` to `scenarios/`. Idempotent.
+- [x] Creates `FILES_BUCKET` and uploads `scenarios/*.json` to `scenarios/`. Idempotent.
 
 ### BE-034 · chore(local): init script that creates the SQS queues
 
@@ -379,9 +381,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `user-actions.fifo` with a DLQ (`maxReceiveCount: 3`), visibility timeout 60 s, content-based dedup **off**.
-- [ ] `faults` queue (FIFO or standard, matching infra's choice).
-- [ ] Queue URLs printed and matching `.env.example`.
+- [x] `user-actions.fifo` with a DLQ (`maxReceiveCount: 3`), visibility timeout 60 s, content-based dedup **off**.
+- [x] `faults` queue (FIFO or standard, matching infra's choice).
+- [x] Queue URLs printed and matching `.env.example`.
 
 ### BE-035 · spike: verify LocalStack supports dynamodb:updateItem.waitForTaskToken (O-02)
 
@@ -407,9 +409,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `test/helpers/` with: env loader for compose, real clients pointing at LocalStack/Redis, unique id/prefix per test file, cleanup helpers.
-- [ ] Integration tests skip with a clear message when LocalStack isn't reachable.
-- [ ] One smoke integration test (write and read a DynamoDB item).
+- [x] `test/helpers/` with: env loader for compose, real clients pointing at LocalStack/Redis, unique id/prefix per test file, cleanup helpers.
+- [x] Integration tests skip with a clear message when LocalStack isn't reachable.
+- [x] One smoke integration test (write and read a DynamoDB item).
 
 ### BE-038 · ci: run integration tests against docker-compose
 
@@ -460,11 +462,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Middleware uses `aws-jwt-verify` `CognitoJwtVerifier` (`tokenUse: "access"`, `clientId`, `userPoolId` from config).
-- [ ] Sets `req.user = { userId: sub, username }` from the verified token only.
-- [ ] Missing, malformed, expired or wrong-client token → 401 `UNAUTHORIZED` (standard error body).
-- [ ] Express `Request` type augmented with `user`.
-- [ ] The verifier is injectable so tests don't hit the JWKS.
+- [x] Middleware uses `aws-jwt-verify` `CognitoJwtVerifier` (`tokenUse: "access"`, `clientId`, `userPoolId` from config).
+- [x] Sets `req.user = { userId: sub, username }` from the verified token only.
+- [x] Missing, malformed, expired or wrong-client token → 401 `UNAUTHORIZED` (standard error body).
+- [x] Express `Request` type augmented with `user`.
+- [x] The verifier is injectable so tests don't hit the JWKS.
 
 ### BE-043 · feat(auth): support dev mode with x-dev-user header
 
@@ -472,8 +474,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] With `AUTH_MODE=dev`, `x-dev-user: <id>[:<username>]` sets `req.user`; missing header → 401.
-- [ ] Logged once at startup at warn level ("dev auth enabled").
+- [x] With `AUTH_MODE=dev`, `x-dev-user: <id>[:<username>]` sets `req.user`; missing header → 401.
+- [x] Logged once at startup at warn level ("dev auth enabled").
 
 ### BE-044 · test(auth): unit tests for the auth middleware
 
@@ -481,7 +483,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Cases: no header, non-Bearer header, verifier rejects, verifier accepts, dev mode with and without header, health routes reachable without a token.
+- [x] Cases: no header, non-Bearer header, verifier rejects, verifier accepts, dev mode with and without header, health routes reachable without a token.
 
 ### BE-045 · docs(auth): decide which claim the leaderboard shows (O-04)
 
@@ -521,9 +523,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `scenarios.repo.ts`: `list()` and `get(id)` read `scenarios/` in `FILES_BUCKET`, validate with zod and cache in memory (one load per process, plus a manual `reload()`).
-- [ ] An invalid file is logged and skipped, without crashing the process.
-- [ ] Integration test against LocalStack.
+- [x] `scenarios.repo.ts`: `list()` and `get(id)` read `scenarios/` in `FILES_BUCKET`, validate with zod and cache in memory (one load per process, plus a manual `reload()`).
+- [x] An invalid file is logged and skipped, without crashing the process.
+- [x] Integration test against LocalStack.
+
+> **MVP status (2026-11-02):** Cache is per process with an optional TTL instead of a manual `reload()`.
 
 ### BE-049 · feat(scenarios): add public scenario views (no validFixes)
 
@@ -540,9 +544,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Routes registered in OpenAPI; 404 for an unknown id.
-- [ ] Supertest tests with a fake repo.
-- [ ] `pnpm openapi` run, ARCHITECTURE §6 updated if anything changed.
+- [x] Routes registered in OpenAPI; 404 for an unknown id.
+- [x] Supertest tests with a fake repo.
+- [x] `pnpm openapi` run, ARCHITECTURE §6 updated if anything changed.
 
 ### BE-051 · ci: sync scenarios to S3 in the release workflow
 
@@ -581,9 +585,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] camelCase domain ↔ snake_case item per ARCHITECTURE §7.1; `fromItem` validates with zod.
-- [ ] `task_token` is never exposed in the domain view returned to routes.
-- [ ] Round-trip unit tests.
+- [x] camelCase domain ↔ snake_case item per ARCHITECTURE §7.1; `fromItem` validates with zod.
+- [x] `task_token` is never exposed in the domain view returned to routes.
+- [x] Round-trip unit tests.
 
 ### BE-055 · feat(sessions): repo create with attribute_not_exists
 
@@ -591,8 +595,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `create(session)` does `PutItem` with `attribute_not_exists(session_id)`; condition failure becomes a domain error.
-- [ ] `SessionsRepo` interface exported plus an in-memory fake for service tests.
+- [x] `create(session)` does `PutItem` with `attribute_not_exists(session_id)`; condition failure becomes a domain error.
+- [x] `SessionsRepo` interface exported plus an in-memory fake for service tests.
 
 ### BE-056 · feat(sessions): repo get by userId and sessionId
 
@@ -600,7 +604,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `get(userId, sessionId)` → `Session | null` (`GetItem`, never a Scan). Fake supports it too.
+- [x] `get(userId, sessionId)` → `Session | null` (`GetItem`, never a Scan). Fake supports it too.
 
 ### BE-057 · feat(sessions): repo conditional state transition
 
@@ -608,8 +612,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `transition(userId, sessionId, from, to, extra?)` uses `ConditionExpression: #state = :from`, sets `updated_at`, plus optional fields (`ended_at`, `failure_reason`).
-- [ ] `ConditionalCheckFailedException` → `SessionStateConflict` domain error (the SDK error name never leaves the repo).
+- [x] `transition(userId, sessionId, from, to, extra?)` uses `ConditionExpression: #state = :from`, sets `updated_at`, plus optional fields (`ended_at`, `failure_reason`).
+- [x] `ConditionalCheckFailedException` → `SessionStateConflict` domain error (the SDK error name never leaves the repo).
 
 ### BE-058 · feat(sessions): repo worker updates (acknowledge, valid fix, counters)
 
@@ -617,10 +621,10 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `markAcknowledged(userId, sessionId, at)`: sets `acknowledged_at` only if it doesn't exist (first time only).
-- [ ] `markValidFix(userId, sessionId, at)`: sets `valid_fix_applied_at` only if it doesn't exist.
-- [ ] `incrementCounters(userId, sessionId, { actions, wrong })` uses atomic `ADD`.
-- [ ] All updates also set `updated_at`.
+- [x] `markAcknowledged(userId, sessionId, at)`: sets `acknowledged_at` only if it doesn't exist (first time only).
+- [x] `markValidFix(userId, sessionId, at)`: sets `valid_fix_applied_at` only if it doesn't exist.
+- [x] `incrementCounters(userId, sessionId, { actions, wrong })` uses atomic `ADD`.
+- [x] All updates also set `updated_at`.
 
 ### BE-059 · feat(sessions): repo list by user with cursor pagination
 
@@ -645,9 +649,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `Orchestration { start(input), completeTask(token, output), failTask(token, error, cause) }`.
+- [x] `Orchestration { start(input), completeTask(token, output), failTask(token, error, cause) }`.
 - [ ] zod schemas for the execution input (ARCHITECTURE §8.1) and task output (§8.2).
-- [ ] `orchestration.fake.ts` that records calls, for tests.
+- [x] `orchestration.fake.ts` that records calls, for tests.
+
+> **MVP status (2026-11-02):** MVP shape: `start` / `completeTask` / `failTask` take session keys and an optional task token (`orchestration.ts`); the §8.1 execution input schema comes with BE-062.
 
 ### BE-062 · feat(orchestration): implement start with Step Functions
 
@@ -694,12 +700,14 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `createSessionsService(deps)` with `startSession(user, scenarioId)` following ARCHITECTURE §4.2 step 1: acquire the lock → put `STARTING` (with `username`) → append `SESSION_STARTED` → start the execution (input §8.1 with a new `faultId`) → store `execution_arn`.
-- [ ] Lock taken → `conflict("SESSION_BUSY", …, { retryAfterSeconds })` from the lock's remaining time.
-- [ ] Unknown scenario → 404 before taking the lock.
-- [ ] If put or start fails: mark `FAILED` (best effort), release the lock, rethrow → 500.
-- [ ] Unit tests for each branch with fakes and a fixed clock.
-- [ ] MVP (Nov 5): no lock and no Redis events when `REDIS_URL` is unset (BE-129); `start` goes through direct orchestration (BE-128).
+- [x] `createSessionsService(deps)` with `startSession(user, scenarioId)` following ARCHITECTURE §4.2 step 1: acquire the lock → put `STARTING` (with `username`) → append `SESSION_STARTED` → start the execution (input §8.1 with a new `faultId`) → store `execution_arn`.
+- [x] Lock taken → `conflict("SESSION_BUSY", …, { retryAfterSeconds })` from the lock's remaining time.
+- [x] Unknown scenario → 404 before taking the lock.
+- [x] If put or start fails: mark `FAILED` (best effort), release the lock, rethrow → 500.
+- [x] Unit tests for each branch with fakes and a fixed clock.
+- [x] MVP (Nov 5): no lock and no Redis events when `REDIS_URL` is unset (BE-129); `start` goes through direct orchestration (BE-128).
+
+> **MVP status (2026-11-02):** the busy check is `findActive()` (D-30), not the Redis lock.
 
 ### BE-067 · feat(sessions): add POST /api/sessions
 
@@ -707,8 +715,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] 201 `{ sessionId }`; 404 unknown scenario; 409 `SESSION_BUSY` with `details.retryAfterSeconds`.
-- [ ] Registered in OpenAPI; supertest tests.
+- [x] 201 `{ sessionId }`; 404 unknown scenario; 409 `SESSION_BUSY` with `details.retryAfterSeconds`.
+- [x] Registered in OpenAPI; supertest tests.
 
 ### BE-068 · feat(sessions): add GET /api/sessions/:sessionId
 
@@ -716,9 +724,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Reads with `PK = req.user.userId`; missing or someone else's → 404.
-- [ ] Returns `SessionView` (no `task_token`, no `execution_arn`).
-- [ ] Registered in OpenAPI; supertest tests including the other-user 404.
+- [x] Reads with `PK = req.user.userId`; missing or someone else's → 404.
+- [x] Returns `SessionView` (no `task_token`, no `execution_arn`).
+- [x] Registered in OpenAPI; supertest tests including the other-user 404.
 
 ### BE-069 · feat(sessions): add GET /api/me/sessions
 
@@ -801,9 +809,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `KubeConfig.loadFromDefault()`; namespaced calls on `MOCK_NAMESPACE` only.
-- [ ] Maps to domain types (desired/ready replicas, pod phase, ready, restarts, age).
-- [ ] Only this file imports `@kubernetes/client-node`.
+- [x] `KubeConfig.loadFromDefault()`; namespaced calls on `MOCK_NAMESPACE` only.
+- [x] Maps to domain types (desired/ready replicas, pod phase, ready, restarts, age).
+- [x] Only this file imports `@kubernetes/client-node`.
 
 ### BE-077 · feat(mock-cluster): read pod logs
 
@@ -811,8 +819,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Picks the pods for a deployment by label selector, reads the last 100 lines (`tailLines`), merges by pod.
-- [ ] No pods (scaled to 0) → empty lines, not an error.
+- [x] Picks the pods for a deployment by label selector, reads the last 100 lines (`tailLines`), merges by pod.
+- [x] No pods (scaled to 0) → empty lines, not an error.
 
 ### BE-078 · feat(mock-cluster): scale and rollout-restart deployments
 
@@ -820,9 +828,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `scale` patches `deployments/scale`; `restart` patches `spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"]`.
-- [ ] Both are idempotent and namespaced; replicas are bounds-checked (1–3) before the call.
-- [ ] Confirm the RBAC in ARCHITECTURE §8.6 covers both verbs.
+- [x] `scale` patches `deployments/scale`; `restart` patches `spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"]`.
+- [x] Both are idempotent and namespaced; replicas are bounds-checked (1–3) before the call.
+- [x] Confirm the RBAC in ARCHITECTURE §8.6 covers both verbs.
 
 ### BE-079 · feat(mock-cluster): HTTP health checks with a timeout
 
@@ -830,8 +838,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] GET `MOCK_HEALTH_URL_TEMPLATE` with `{service}` replaced; `AbortSignal.timeout(1500)`; non-2xx or timeout → unhealthy; records `latencyMs`.
-- [ ] `fetch` injectable; unit tests for 200, 500 and timeout.
+- [x] GET `MOCK_HEALTH_URL_TEMPLATE` with `{service}` replaced; `AbortSignal.timeout(1500)`; non-2xx or timeout → unhealthy; records `latencyMs`.
+- [x] `fetch` injectable; unit tests for 200, 500 and timeout.
 
 ### BE-080 · feat(mock-cluster): select the gateway implementation from config
 
@@ -839,7 +847,7 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `createMockClusterGateway(config)` returns the fake for `MOCK_CLUSTER=fake` and the k8s one otherwise; used by both composition roots.
+- [x] `createMockClusterGateway(config)` returns the fake for `MOCK_CLUSTER=fake` and the k8s one otherwise; used by both composition roots.
 
 ---
 
@@ -882,8 +890,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `enqueue(message)` validates with `QueueMessageSchema`, then `SendMessage` with `MessageGroupId = sessionId` and `MessageDeduplicationId = actionId`.
-- [ ] `ActionQueue` interface + fake.
+- [x] `enqueue(message)` validates with `QueueMessageSchema`, then `SendMessage` with `MessageGroupId = sessionId` and `MessageDeduplicationId = actionId`.
+- [x] `ActionQueue` interface + fake.
 
 ### BE-085 · feat(actions): add POST /api/sessions/:sessionId/actions
 
@@ -891,9 +899,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Loads the session for the caller (404 if not theirs), loads the scenario, checks the action, enqueues with a new ULID `actionId` and `requestedAt`.
-- [ ] 202 `{ actionId }`; 409 `SESSION_NOT_ACTIVE`; 422 `ACTION_NOT_ALLOWED`; 400 bad shape.
-- [ ] Registered in OpenAPI; supertest tests.
+- [x] Loads the session for the caller (404 if not theirs), loads the scenario, checks the action, enqueues with a new ULID `actionId` and `requestedAt`.
+- [x] 202 `{ actionId }`; 409 `SESSION_NOT_ACTIVE`; 422 `ACTION_NOT_ALLOWED`; 400 bad shape.
+- [x] Registered in OpenAPI; supertest tests.
 
 ### BE-086 · feat(actions): add GET /api/sessions/:sessionId/logs
 
@@ -901,10 +909,12 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `service` query param must be in the scenario's `targets` (422 otherwise) **before** any k8s call.
-- [ ] Session must be active (409 otherwise).
+- [x] `service` query param must be in the scenario's `targets` (422 otherwise) **before** any k8s call.
+- [x] Session must be active (409 otherwise).
 - [ ] Returns `{ service, lines }` (last 100) and appends a `VIEW_LOGS` event; not queued (D-15).
-- [ ] Registered in OpenAPI; supertest tests with the fake gateway.
+- [x] Registered in OpenAPI; supertest tests with the fake gateway.
+
+> **MVP status (2026-11-02):** No event log in the MVP, so `VIEW_LOGS` isn't recorded yet.
 
 ### BE-087 · feat(sessions): add POST /api/sessions/:sessionId/abandon
 
@@ -912,9 +922,9 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Caller must own the session (404); terminal session → 409.
-- [ ] Enqueues a `USER` message of type `ABANDON`; returns 202.
-- [ ] Registered in OpenAPI; supertest tests.
+- [x] Caller must own the session (404); terminal session → 409.
+- [x] Enqueues a `USER` message of type `ABANDON`; returns 202.
+- [x] Registered in OpenAPI; supertest tests.
 
 ---
 
@@ -926,11 +936,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Long polls (`WaitTimeSeconds: 20`, `MaxNumberOfMessages: 10`), stops on `AbortSignal`.
-- [ ] Parses each body with `QueueMessageSchema`; invalid → logged at error and **not** deleted (it reaches the DLQ after 3 receives).
-- [ ] Dispatches to a handler map by type; deletes only after the handler succeeds.
-- [ ] A handler error never kills the loop.
-- [ ] Unit tests with a fake queue client.
+- [x] Long polls (`WaitTimeSeconds: 20`, `MaxNumberOfMessages: 10`), stops on `AbortSignal`.
+- [x] Parses each body with `QueueMessageSchema`; invalid → logged at error and **not** deleted (it reaches the DLQ after 3 receives).
+- [x] Dispatches to a handler map by type; deletes only after the handler succeeds.
+- [x] A handler error never kills the loop.
+- [x] Unit tests with a fake queue client.
 
 ### BE-089 · feat(worker): add action idempotency
 
@@ -948,11 +958,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] If the session is `INCIDENT_ACTIVE`: `markAcknowledged` (first time only) and append `ACKNOWLEDGED`.
+- [x] If the session is `INCIDENT_ACTIVE`: `markAcknowledged` (first time only) and append `ACKNOWLEDGED`.
 - [ ] If still `STARTING`: record the event but don't set `acknowledged_at` (doesn't count toward TTD).
-- [ ] Counts toward `actions_count`, never toward `wrong_actions`.
-- [ ] Unit tests with a fixed clock.
-- [ ] MVP (Nov 5): no Redis event when `REDIS_URL` is unset (BE-129).
+- [x] Counts toward `actions_count`, never toward `wrong_actions`.
+- [x] Unit tests with a fixed clock.
+- [x] MVP (Nov 5): no Redis event when `REDIS_URL` is unset (BE-129).
 
 ### BE-091 · feat(worker): handle SCALE_DEPLOYMENT and RESTART_DEPLOYMENT
 
@@ -960,11 +970,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Re-checks that the session is `INCIDENT_ACTIVE` and the target is in the scenario (skip and ack if not).
-- [ ] Applies via the gateway, then: valid fix → `markValidFix`; otherwise `wrong += 1`; always `actions += 1`.
+- [x] Re-checks that the session is `INCIDENT_ACTIVE` and the target is in the scenario (skip and ack if not).
+- [x] Applies via the gateway, then: valid fix → `markValidFix`; otherwise `wrong += 1`; always `actions += 1`.
 - [ ] Appends an `ACTION` event with `valid`.
-- [ ] Unit tests with the fake cluster: valid fix, wrong target, scale below `minReplicas`.
-- [ ] MVP (Nov 5): no Redis event when `REDIS_URL` is unset (BE-129).
+- [x] Unit tests with the fake cluster: valid fix, wrong target, scale below `minReplicas`.
+- [x] MVP (Nov 5): no Redis event when `REDIS_URL` is unset (BE-129).
 
 ### BE-092 · feat(worker): handle ABANDON
 
@@ -972,9 +982,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Loads the session; if it has a `task_token`, calls `failTask(token, "Abandoned", …)`; "already-ended" is fine.
-- [ ] If there's no token yet (still `STARTING`), decide and document the behavior (for example, stop the execution or wait). Record it in DECISIONS.
-- [ ] Unit tests.
+- [x] Loads the session; if it has a `task_token`, calls `failTask(token, "Abandoned", …)`; "already-ended" is fine.
+- [x] If there's no token yet (still `STARTING`), decide and document the behavior (for example, stop the execution or wait). Record it in DECISIONS.
+- [x] Unit tests.
+
+> **MVP status (2026-11-02):** `failTask(ABANDONED)` from any active state, including `STARTING` (D-31).
 
 ### BE-093 · feat(worker): graceful shutdown of the consumer
 
@@ -984,6 +996,8 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 - [ ] On `SIGTERM`: stop receiving, wait for in-flight handlers up to 25 s, close Redis, exit 0.
 - [ ] Unit test with an abort during a slow handler.
+
+> **MVP status (2026-11-02):** the consumer finishes the current batch after abort, and `worker.ts` waits up to 25 s for the loops. Redis and the slow-handler test come with M2.
 
 ### BE-094 · test(worker): consumer integration test against LocalStack SQS
 
@@ -1057,8 +1071,10 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 - [ ] Every 2 s with an `AbortSignal`; reads the lock holder; **no lock → no k8s calls**.
 - [ ] Needs `userId` to read the session. Decide how the worker gets it from the lock (for example, store `sessionId` and also `session:{id}:owner`, or put `userId:sessionId` in the lock value). Record it in ARCHITECTURE §7.2.
 - [ ] Builds and stores the snapshot; one failing tick is logged and the loop continues.
-- [ ] Unit tests with a fake clock and fakes.
-- [ ] MVP (Nov 5): without Redis, find the active session as in BE-129 and don't store snapshots; the api builds them on request (BE-130).
+- [x] Unit tests with a fake clock and fakes.
+- [x] MVP (Nov 5): without Redis, find the active session as in BE-129 and don't store snapshots; the api builds them on request (BE-130).
+
+> **MVP status (2026-11-02):** no snapshot storage; the monitor finds the session with `findActive()` (BE-129) and enforces timeouts (D-31).
 
 ### BE-101 · feat(worker): complete the task when the incident is resolved
 
@@ -1067,10 +1083,10 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 **Acceptance criteria**
 
 - [ ] On resolution: compute TTD/TTR/score, append `RESOLVED` and `SCORED` events, call `completeTask(token, output §8.2)`.
-- [ ] Runs once per session (guard with a Redis flag or the session state) even if the next tick still sees it healthy.
-- [ ] "already-ended" from the orchestration is logged, not retried.
-- [ ] Unit tests.
-- [ ] MVP (Nov 5): `completeTask` is the direct orchestration from BE-128 (writes `RESOLVED` itself, no task token); guard with the session state.
+- [x] Runs once per session (guard with a Redis flag or the session state) even if the next tick still sees it healthy.
+- [x] "already-ended" from the orchestration is logged, not retried.
+- [x] Unit tests.
+- [x] MVP (Nov 5): `completeTask` is the direct orchestration from BE-128 (writes `RESOLVED` itself, no task token); guard with the session state.
 
 ### BE-102 · feat(worker): handle SESSION_ENDED cleanup
 
@@ -1080,8 +1096,10 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 - [ ] Per ARCHITECTURE §4.2 step 7: flush events → reset the mock system to `baseline` → wait until healthy (max 60 s; warn if not) → release the lock **only if it holds this sessionId** → delete `dashboard:{id}` and `session:{id}:health`.
 - [ ] Each step runs even if an earlier one fails (except the lock release, which is always attempted last); failures logged with `sessionId`.
-- [ ] Idempotent on redelivery.
-- [ ] Unit tests with fakes.
+- [x] Idempotent on redelivery.
+- [x] Unit tests with fakes.
+
+> **MVP status (2026-11-02):** resets every deployment to `baseline` and clears the health streak; events, lock and Redis keys arrive in M2.
 
 ### BE-103 · feat(dashboard): add GET /api/sessions/:sessionId/dashboard
 
@@ -1089,11 +1107,13 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] Ownership checked first (404).
+- [x] Ownership checked first (404).
 - [ ] Returns the Redis snapshot; if it's missing or older than 10 s, returns the last known one with `stale: true`, or a minimal snapshot built from the DynamoDB item (empty `services`).
-- [ ] Terminal sessions return a minimal final snapshot.
-- [ ] Registered in OpenAPI; supertest tests for fresh, stale and missing.
-- [ ] MVP (Nov 5): without Redis, build the snapshot on request (BE-130).
+- [x] Terminal sessions return a minimal final snapshot.
+- [x] Registered in OpenAPI; supertest tests for fresh, stale and missing.
+- [x] MVP (Nov 5): without Redis, build the snapshot on request (BE-130).
+
+> **MVP status (2026-11-02):** built on request (BE-130); a failed cluster read returns a minimal snapshot with `stale: true`.
 
 ### BE-104 · docs: confirm cross-repo proposals D-11, D-12 and D-13 with infra (O-01)
 
@@ -1114,9 +1134,11 @@ The Oct 29 deliverable needs infra's Deployments. Write down what they need and 
 
 **Acceptance criteria**
 
-- [ ] `scripts/dev-inject.ts` long-polls the LocalStack `faults` queue and, per message: applies the fault to the fake cluster, does the conditional update `STARTING → INCIDENT_ACTIVE` with `fault_injected_at`, appends `FAULT_INJECTED` (same as ARCHITECTURE §8.3).
-- [ ] `pnpm dev:inject` script.
-- [ ] Needs the fake cluster to be shared with the worker. Decide how (run inside the worker process when `MOCK_CLUSTER=fake`, or store fake state in Redis) and document it.
+- [x] `scripts/dev-inject.ts` long-polls the LocalStack `faults` queue and, per message: applies the fault to the fake cluster, does the conditional update `STARTING → INCIDENT_ACTIVE` with `fault_injected_at`, appends `FAULT_INJECTED` (same as ARCHITECTURE §8.3).
+- [x] `pnpm dev:inject` script.
+- [x] Needs the fake cluster to be shared with the worker. Decide how (run inside the worker process when `MOCK_CLUSTER=fake`, or store fake state in Redis) and document it.
+
+> **MVP status (2026-11-02):** Implemented as `src/dev/fake-injector.ts`, run inside `pnpm dev:local` / `pnpm dev:memory` so it shares the fake cluster with the worker (D-29).
 
 ### BE-106 · chore(scripts): add a seed script with demo sessions
 
@@ -1352,13 +1374,13 @@ The Nov 5 MVP runs without Step Functions (DECISIONS D-24). This implements the 
 
 **Acceptance criteria**
 
-- [ ] `ORCHESTRATION_MODE=direct` (default `stepfunctions`) selects `orchestration.direct.ts`.
-- [ ] `start(input)`: sends the `FAULT` message (infra ARCHITECTURE §7) to `FAULTS_QUEUE_URL` with `DelaySeconds = min(warmupSeconds, 900)`, standing in for the `Warmup` state.
-- [ ] `completeTask(output)`: conditional update `INCIDENT_ACTIVE → RESOLVED` with the score fields and `ended_at` (what `PersistResolved` does), then resets the mock system to the scenario baseline.
-- [ ] `failTask`: conditional update to `FAILED` with `failure_reason` and `ended_at`, then the same reset.
-- [ ] The worker marks a session `FAILED` (`TIMEOUT`) once `maxResolveSeconds` pass after `fault_injected_at`.
-- [ ] No task token in this mode; callers don't depend on one.
-- [ ] Unit tests with fakes.
+- [x] `ORCHESTRATION_MODE=direct` (default `stepfunctions`) selects `orchestration.direct.ts`.
+- [x] `start(input)`: sends the `FAULT` message (infra ARCHITECTURE §7) to `FAULTS_QUEUE_URL` with `DelaySeconds = min(warmupSeconds, 900)`, standing in for the `Warmup` state.
+- [x] `completeTask(output)`: conditional update `INCIDENT_ACTIVE → RESOLVED` with the score fields and `ended_at` (what `PersistResolved` does), then resets the mock system to the scenario baseline.
+- [x] `failTask`: conditional update to `FAILED` with `failure_reason` and `ended_at`, then the same reset.
+- [x] The worker marks a session `FAILED` (`TIMEOUT`) once `maxResolveSeconds` pass after `fault_injected_at`.
+- [x] No task token in this mode; callers don't depend on one.
+- [x] Unit tests with fakes.
 
 ### BE-129 · feat(platform): run without Redis for the MVP
 
@@ -1368,9 +1390,9 @@ The Nov 5 MVP has no ElastiCache (DECISIONS D-24); one demo user, one session at
 
 **Acceptance criteria**
 
-- [ ] `REDIS_URL` is optional. Unset → no lock, `/readyz` skips the Redis check, events aren't buffered.
-- [ ] The worker finds the active session without the lock (for example a scan for `state IN (STARTING, INCIDENT_ACTIVE)`; the table is tiny in the MVP). Record the choice in ARCHITECTURE.
-- [ ] Unit tests for the no-Redis paths.
+- [x] `REDIS_URL` is optional. Unset → no lock, `/readyz` skips the Redis check, events aren't buffered.
+- [x] The worker finds the active session without the lock (for example a scan for `state IN (STARTING, INCIDENT_ACTIVE)`; the table is tiny in the MVP). Record the choice in ARCHITECTURE.
+- [x] Unit tests for the no-Redis paths.
 
 ### BE-130 · feat(dashboard): build the snapshot on request when Redis is off
 
@@ -1380,7 +1402,7 @@ The Nov 5 MVP has no Redis snapshot store (DECISIONS D-24).
 
 **Acceptance criteria**
 
-- [ ] Without Redis, `GET /api/sessions/:sessionId/dashboard` builds the `DashboardSnapshot` from the mock-cluster gateway on each request (the api's `mock-reader` RBAC allows it).
-- [ ] `recentEvents` come from the session item timestamps (started, fault injected, acknowledged, resolved).
-- [ ] Same response shape as with Redis, so the frontend doesn't change.
-- [ ] Unit tests.
+- [x] Without Redis, `GET /api/sessions/:sessionId/dashboard` builds the `DashboardSnapshot` from the mock-cluster gateway on each request (the api's `mock-reader` RBAC allows it).
+- [x] `recentEvents` come from the session item timestamps (started, fault injected, acknowledged, resolved).
+- [x] Same response shape as with Redis, so the frontend doesn't change.
+- [x] Unit tests.

@@ -10,7 +10,7 @@ export const API_VERSION = "0.1.0";
 
 /**
  * The frontend contract (D-04). Only routes that exist (or exist in the Nov 5 MVP) are registered;
- * M2+ routes (logs, abandon, history, stats, leaderboard) join when they're built.
+ * M2+ routes (history, stats, leaderboard) join when they're built.
  */
 export function buildOpenApiDocument() {
   const registry = createRegistry();
