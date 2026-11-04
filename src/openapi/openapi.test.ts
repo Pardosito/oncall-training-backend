@@ -17,8 +17,10 @@ describe("OpenAPI document", () => {
       "/api/scenarios/{scenarioId}",
       "/api/sessions",
       "/api/sessions/{sessionId}",
+      "/api/sessions/{sessionId}/abandon",
       "/api/sessions/{sessionId}/actions",
       "/api/sessions/{sessionId}/dashboard",
+      "/api/sessions/{sessionId}/logs",
       "/healthz",
       "/readyz",
     ]);

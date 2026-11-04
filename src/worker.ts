@@ -1,17 +1,30 @@
 import { createAwsClients, destroyAwsClients } from "./platform/aws.js";
+import { systemClock } from "./platform/clock.js";
 import {
   bootstrap,
   closeServer,
   createHealthServer,
   onShutdownSignal,
 } from "./platform/process.js";
+import { createAwsBackedServices, createMockCluster, startWorkerLoops } from "./runtime.js";
+
+/** In-flight messages get this long to finish after SIGTERM (CONVENTIONS §10). */
+const DRAIN_TIMEOUT_MS = 25_000;
 
 const { config, logger } = bootstrap("worker");
 const aws = createAwsClients(config);
+const backed = createAwsBackedServices(config, logger, aws);
+const services = {
+  config,
+  logger,
+  clock: systemClock,
+  ...backed,
+  cluster: await createMockCluster(config, backed.scenarios),
+};
 
 /** Aborted on SIGTERM; every loop (consumer, monitor) stops on it (CONVENTIONS §10). */
 const root = new AbortController();
-const loops: Promise<void>[] = [];
+const loops = startWorkerLoops(services, root.signal);
 
 const healthServer = createHealthServer(() => !root.signal.aborted);
 healthServer.listen(config.WORKER_HEALTH_PORT, () => {
@@ -28,7 +41,9 @@ healthServer.listen(config.WORKER_HEALTH_PORT, () => {
 
 onShutdownSignal(logger, async () => {
   root.abort();
-  await Promise.allSettled(loops);
+  const drained = Promise.allSettled(loops);
+  const timeout = new Promise((resolve) => setTimeout(resolve, DRAIN_TIMEOUT_MS).unref());
+  await Promise.race([drained, timeout]);
   await closeServer(healthServer, 1_000);
   destroyAwsClients(aws);
 });

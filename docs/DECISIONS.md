@@ -43,6 +43,9 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 | D-26 | 2026-11-01 | Redis client (BE-023) deferred to M2; `/readyz` checks only DynamoDB and S3 until then                                              | Decided (temporary until Nov 19) |
 | D-27 | 2026-11-01 | One image built for `linux/amd64`, tagged with the short git SHA, pushed only by `release.yml`                                      | Decided                          |
 | D-28 | 2026-11-01 | Contract first: MVP schemas and routes go into `openapi.json` before their handlers; `FAULT` follows infra §7 with a shared fixture | Decided                          |
+| D-29 | 2026-11-02 | MVP local loop: `dev:local` runs api + worker + fake injector in one process; direct mode sends `SESSION_ENDED`                     | Decided                          |
+| D-30 | 2026-11-02 | MVP busy check: `SESSION_BUSY` from a filtered DynamoDB scan for an active session (no Redis lock)                                  | Decided (temporary until Nov 19) |
+| D-31 | 2026-11-02 | MVP worker semantics: timeouts in the monitor, resolution = every target up, no action idempotency key                              | Decided (temporary until Nov 19) |
 
 ---
 
@@ -191,26 +194,51 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 **How:** the MVP schemas (scenarios, sessions, actions, dashboard) and their routes were registered first, and the spec was committed before the handlers. Only MVP routes are in the spec, so it never promises a route that returns 404. For `FAULT`, infra's §7 shape wins over backend §8.1 (it carries `sessionId`, `userId` and `sentAt`). `test/fixtures/fault-message.json` is copied into the infra repo's injector tests, so a change on either side fails a test.
 **Also:** `QueueMessageSchema` accepts `AWAIT_FIX` (infra D-13) now, so an M2 message is never treated as poison.
 
+### D-29 · One-process local loop and `SESSION_ENDED` in direct mode
+
+**Why:** `MOCK_CLUSTER=fake` keeps its state in memory, so a separate api and worker would each see a different fake cluster: the dashboard would never show the worker's fix. The injector lives in the infra repo, so something has to stand in for it locally (BE-105).
+**How:** `pnpm dev:local` (`src/dev-local.ts`) runs the api, the worker loops and a fake injector (`src/dev/fake-injector.ts`, which consumes `faults` and does the §8.3 update) around one shared fake cluster, with DynamoDB, S3 and SQS in LocalStack. `pnpm dev:memory` (`--in-memory`) swaps those for in-memory implementations and reads `scenarios/` from disk, so the frontend can run the whole loop with no Docker. Neither mode exists in the image's entrypoints.
+**Also:** in direct mode, `completeTask`/`failTask` write the terminal state and then send `SESSION_ENDED` to `user-actions`, exactly as the state machine will (D-11). The worker therefore resets the mock system through one handler in both modes, and nothing changes for it in M2.
+**Trade-off:** if the process dies between the terminal write and the `SESSION_ENDED` send, the mock system isn't reset until the next session's fault is applied on top. Accepted for the MVP; M2's state machine retries the send.
+
+### D-30 · MVP busy check without Redis
+
+**Why:** D-05's lock needs Redis, which the MVP doesn't have (D-26), but two sessions on one mock system would break each other.
+**How:** `POST /api/sessions` asks `SessionsRepo.findActive()`, a Scan of `Sessions` filtered on `state IN (STARTING, INCIDENT_ACTIVE)` (the one documented exception to "no scans", ARCHITECTURE §7.1). If it finds one, it answers 409 `SESSION_BUSY` with `retryAfterSeconds` from that session's latest possible end (`warmup + 120 s grace + maxResolve` while `STARTING`, `faultInjectedAt + maxResolve` while active). The worker's monitor uses the same query every 2 s to find the session to watch.
+**Trade-off:** check-then-write, so two starts in the same few milliseconds can both pass; the table is tiny, so the scan is cheap. Replaced by the Redis lock in M2 (BE-063..066).
+
+### D-31 · MVP worker semantics
+
+**Why:** without Step Functions and Redis, the worker takes over three jobs the M2 design gives to other components.
+**How:**
+
+- **Timeouts:** the monitor fails a session stuck in `STARTING` for `warmupSeconds + 120 s` with `ERROR` (the fault never landed), and an incident open longer than `maxResolveSeconds` with `TIMEOUT`.
+- **"Every service healthy" (D-07):** every scenario target has a ready replica and answers its health check (dashboard health is not `down`). `degraded` counts as up, so a slow `/health` can't block resolution forever.
+- **Idempotency (BE-089 is M2):** handlers re-read the session and skip messages that no longer apply, and k8s patches are idempotent. A crash between the patch and the counter update can still count an action twice on redelivery.
+- **`ABANDON` while `STARTING`** (BE-092's open question): the session goes straight to `FAILED`/`ABANDONED`, and the fake injector skips the fault because the session is no longer `STARTING`. The real injector must do the same (its §8.3 update is conditional on `STARTING`).
+- **Reset before the fault:** the first monitor tick that sees a `STARTING` session scales every target to `baseline`. This covers infra's remaining race, where a FAULT is applied in the milliseconds after an abandon and after that session's reset already ran. The api can't do it because its RBAC is read-only, and it's safe because the fault is delayed by the warmup. It runs only while the fault is at least 5 s away: the injector breaks the system just before it flips the session to `INCIDENT_ACTIVE`, so a reset near the fault time could undo the fault. A short warmup, or a worker restarting late in one, just skips the reset.
+- **LocalStack pinned to 4.4**, because `latest` refuses to start without a `LOCALSTACK_AUTH_TOKEN`.
+
 ---
 
 ## 3. Current limitations
 
-| ID   | Limitation                                                                    | Impact                                                                                       | Mitigation now                                                                           |
-| ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| L-01 | Only one session can run at a time                                            | Other users wait (409) up to about 13 min in the worst case                                  | `retryAfterSeconds` so the UI can show a countdown                                       |
-| L-02 | All pods share `LabRole`; no per-service IAM permissions                      | A compromised pod could reach any AWS resource LabRole allows                                | Namespaces, k8s RBAC, NetworkPolicies; no user input reaches AWS calls unvalidated       |
-| L-03 | Session event buffer lives only in Redis until the session ends               | Redis restart mid-session → that session's analytics are lost                                | DynamoDB keeps score and key timestamps; ElastiCache restarts are rare                   |
-| L-04 | The global lock lives in Redis                                                | If Redis restarts during a session, a second session could start and collide                 | Short demo windows; future DynamoDB-based lock (F-02)                                    |
-| L-05 | Single worker replica                                                         | Seconds of downtime on restart; actions are delayed, not lost                                | Kubernetes restarts it; SQS retains messages; the Step Functions timeout is the backstop |
-| L-06 | Dashboard latency of about 2 s (polling)                                      | UI isn't instant                                                                             | Acceptable for training                                                                  |
-| L-07 | Athena queries take a few seconds                                             | Stats page loads slowly the first time                                                       | 5-min Redis cache; queries filtered by partition                                         |
-| L-08 | Lab credentials expire each session                                           | CI deploy secrets must be refreshed manually                                                 | Deploy only on demand; CI tests never need AWS                                           |
-| L-09 | One scenario, two fix actions, simple health check (`/health` 2xx)            | Limited training value                                                                       | Scope is intentional for the MVP                                                         |
-| L-10 | Linear scoring                                                                | Doesn't reward good diagnosis, only speed and accuracy                                       | Weights live in the scenario JSON, easy to tune                                          |
-| L-11 | No rate limiting on the API                                                   | A user could spam actions                                                                    | One session at a time; actions are validated and cheap                                   |
-| L-12 | Leaderboard shows the Cognito `username`                                      | If it's an email, it leaks the email                                                         | Use a preferred-username or nickname claim (O-04)                                        |
-| L-13 | Mock-system reset after a session can fail                                    | Next session would start on a broken system                                                  | Worker waits for healthy (60 s) and logs an error; the lock is released anyway           |
-| L-14 | Until Nov 19 (MVP, D-24): no global lock, dev auth in EKS, no event log in S3 | Two sessions at once would conflict; any caller can pick a user id; no events for Athena yet | One demo user; ALB limited to the demo IPs (infra INF-138); replaced in M2               |
+| ID   | Limitation                                                                    | Impact                                                                                                               | Mitigation now                                                                               |
+| ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| L-01 | Only one session can run at a time                                            | Other users wait (409) up to about 13 min in the worst case                                                          | `retryAfterSeconds` so the UI can show a countdown                                           |
+| L-02 | All pods share `LabRole`; no per-service IAM permissions                      | A compromised pod could reach any AWS resource LabRole allows                                                        | Namespaces, k8s RBAC, NetworkPolicies; no user input reaches AWS calls unvalidated           |
+| L-03 | Session event buffer lives only in Redis until the session ends               | Redis restart mid-session → that session's analytics are lost                                                        | DynamoDB keeps score and key timestamps; ElastiCache restarts are rare                       |
+| L-04 | The global lock lives in Redis                                                | If Redis restarts during a session, a second session could start and collide                                         | Short demo windows; future DynamoDB-based lock (F-02)                                        |
+| L-05 | Single worker replica                                                         | Seconds of downtime on restart; actions are delayed, not lost                                                        | Kubernetes restarts it; SQS retains messages; the Step Functions timeout is the backstop     |
+| L-06 | Dashboard latency of about 2 s (polling)                                      | UI isn't instant                                                                                                     | Acceptable for training                                                                      |
+| L-07 | Athena queries take a few seconds                                             | Stats page loads slowly the first time                                                                               | 5-min Redis cache; queries filtered by partition                                             |
+| L-08 | Lab credentials expire each session                                           | CI deploy secrets must be refreshed manually                                                                         | Deploy only on demand; CI tests never need AWS                                               |
+| L-09 | One scenario, two fix actions, simple health check (`/health` 2xx)            | Limited training value                                                                                               | Scope is intentional for the MVP                                                             |
+| L-10 | Linear scoring                                                                | Doesn't reward good diagnosis, only speed and accuracy                                                               | Weights live in the scenario JSON, easy to tune                                              |
+| L-11 | No rate limiting on the API                                                   | A user could spam actions                                                                                            | One session at a time; actions are validated and cheap                                       |
+| L-12 | Leaderboard shows the Cognito `username`                                      | If it's an email, it leaks the email                                                                                 | Use a preferred-username or nickname claim (O-04)                                            |
+| L-13 | Mock-system reset after a session can fail                                    | Next session would start on a broken system                                                                          | Worker waits for healthy (60 s) and logs an error; the lock is released anyway               |
+| L-14 | Until Nov 19 (MVP, D-24): no global lock, dev auth in EKS, no event log in S3 | Two near-simultaneous starts could both pass the busy check; any caller can pick a user id; no events for Athena yet | Busy check from DynamoDB (D-30); ALB limited to the demo IPs (infra INF-138); replaced in M2 |
 
 ---
 

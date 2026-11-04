@@ -117,7 +117,16 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 
 **Abandon**: `POST /api/sessions/:id/abandon` enqueues `ABANDON`. The worker calls `SendTaskFailure(task_token, "Abandoned")`, and the Step Functions failure branch continues from step 6.
 
-**MVP mode (Nov 5 → Nov 19, DECISIONS D-24):** steps 1–7 run without Step Functions or Redis. There's no lock or task token. The api sends `FAULT` to `FAULTS_QUEUE_URL` itself (delayed by `warmupSeconds`, at most 900 s). The worker detects resolution, writes `RESOLVED` with the score (or `FAILED` on timeout) and resets the mock system. The dashboard is built on each request. See BE-127 to BE-130.
+**MVP mode (Nov 5 → Nov 19, DECISIONS D-24, D-29–D-31):** steps 1–7 run without Step Functions or Redis. There's no lock or task token.
+
+- **Busy check:** a filtered scan for an active session (D-30).
+- **Fault:** the api sends `FAULT` to `FAULTS_QUEUE_URL` itself, delayed by `warmupSeconds` (at most 900 s).
+- **Monitor (every 2 s):** resets the mock system to `baseline` once per `STARTING` session, before its fault lands. It also fails a session stuck in `STARTING` past `warmupSeconds + 120 s` (`ERROR`) or open past `maxResolveSeconds` (`TIMEOUT`). It also detects resolution (every target up on 2 checks) and writes `RESOLVED` with the score.
+- **End:** the direct orchestration then sends `SESSION_ENDED` like the state machine would, so the same handler resets the mock system to `baseline`.
+- **Abandon:** handled by the worker as `failTask(ABANDONED)`.
+- **Dashboard:** built on each request.
+
+See BE-127 to BE-130.
 
 ## 5. Actions catalog (MVP)
 
@@ -219,7 +228,7 @@ The SPA polls `GET …/dashboard` every 2 s. If the snapshot is missing or older
 | `updated_at`                          | S    | everyone                        |                                     |
 
 **GSI `Leaderboard`**: PK `scenario_id`, SK `score` (N). Sparse, because only `RESOLVED` items have `score`.
-**Access patterns**: GetItem(user, session) · Query(user, newest first, paginated with `LastEvaluatedKey` → base64 cursor) · Query GSI by scenario, descending. **No scans.**
+**Access patterns**: GetItem(user, session) · Query(user, newest first, paginated with `LastEvaluatedKey` → base64 cursor) · Query GSI by scenario, descending. **No scans**, with one exception until Nov 19: `SessionsRepo.findActive()` scans for `state IN (STARTING, INCIDENT_ACTIVE)` to replace the Redis lock (D-30).
 The worker needs `userId` to read an item, which is why every queue message carries `userId`.
 
 ### 7.2 Redis keys
@@ -408,14 +417,19 @@ Parsed once at startup by `src/config/` (`loadConfig(env, "api" | "worker")`). I
 
 `docker-compose.yml`:
 
-- **LocalStack** with `dynamodb,s3,sqs,stepfunctions`. Init scripts in `local/init/` create the table, bucket and queues, upload `scenarios/`, and create the state machine from `local/statemachine.asl.json` (a copy of the infra repo's definition with local ARNs).
-- **Redis**.
+- **LocalStack 4.4** (pinned, D-31) with `dynamodb,s3,sqs`. `local/init/ready.d/01-resources.sh` creates the same resources Terraform does: table `Sessions` with GSI `Leaderboard`, bucket `oncall-training-files-local` with `scenarios/` synced, `user-actions.fifo` (DLQ after 3 receives, visibility 60 s, content dedup off) and the standard queue `faults` (with DLQ). The container reports healthy only once that script finishes. Step Functions (`local/statemachine.asl.json`) joins in M2.
+- **Redis**, unused until M2.
+
+Use path-style queue URLs (`http://localhost:4566/000000000000/<queue>`), as in `.env.example`. The dev scripts load `.env` (`--env-file-if-exists`).
 
 Ways to run, from least to most realistic:
 
-1. `MOCK_CLUSTER=fake`, `AUTH_MODE=dev`, `STATS_MODE=fixture`: API + worker + compose. `scripts/dev-inject.ts` reads the LocalStack `faults` queue and applies the fault to the fake cluster (stands in for the injector).
-2. Same, but with `MOCK_CLUSTER=kubernetes` against a **kind** cluster where the infra repo's mock system (and optionally the injector) is deployed.
+0. `pnpm dev:memory`: api, worker and fake injector in one process, everything in memory, scenarios read from `scenarios/`. No Docker (D-29).
+1. `docker compose up -d && pnpm dev:local`: the same single process with DynamoDB, S3 and SQS in LocalStack. `MOCK_CLUSTER=fake` only works in this single-process mode, because the fake cluster lives in memory.
+2. `pnpm dev` + `pnpm dev:worker` with `MOCK_CLUSTER=kubernetes` against a **kind** cluster where the infra repo's mock system and injector are deployed.
 3. AWS: deployed to EKS by the infra repo's manifests.
+
+Integration tests (`pnpm test:integration`) create their own throwaway table and queues in LocalStack, so they never touch or block dev data. Without LocalStack they are skipped, with a message saying so.
 
 ## 11. Failure handling
 
