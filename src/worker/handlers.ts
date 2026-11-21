@@ -117,6 +117,16 @@ export function createMessageHandler(deps: HandlerDeps): (message: QueueMessage)
     await deps.streaks.clear(message.sessionId);
     const loaded = await load(message);
     if (!loaded) return;
+    // A late SESSION_ENDED (a session abandoned during its warmup ends when its execution
+    // does) must not undo the fault of the session that started since.
+    const active = await deps.sessions.findActive();
+    if (active && active.sessionId !== message.sessionId) {
+      log.warn(
+        { activeSessionId: active.sessionId, outcome: message.outcome },
+        "session ended while another one is running; mock system not reset",
+      );
+      return;
+    }
     // Throwing leaves the message for a retry (and the DLQ after 3).
     await resetToBaseline(deps.cluster, loaded.scenario, log);
     log.info(
@@ -125,13 +135,36 @@ export function createMessageHandler(deps: HandlerDeps): (message: QueueMessage)
     );
   }
 
+  /**
+   * §8.4a (D-13): store the state machine's task token on the session. If the session already
+   * ended (abandoned during the warmup) or is unknown, fail the task right away, so the
+   * execution ends and still sends SESSION_ENDED instead of waiting for its timeout.
+   */
+  async function handleAwaitFix(message: Extract<SystemMessage, { type: "AWAIT_FIX" }>) {
+    const log = deps.logger.child({ sessionId: message.sessionId });
+    const key = { userId: message.userId, sessionId: message.sessionId };
+    const now = deps.clock.now();
+    const session = await deps.sessions.get(key);
+    if (session && (await deps.sessions.setTaskToken(key, message.taskToken, now))) {
+      log.info({ state: session.state }, "task token stored");
+      return;
+    }
+    const result = await deps.orchestration.failTask({
+      key,
+      taskToken: message.taskToken,
+      from: session?.state ?? "STARTING",
+      reason: session?.failureReason ?? "ABANDONED",
+      at: now,
+    });
+    log.info(
+      { state: session?.state ?? "unknown", result },
+      "AWAIT_FIX for an ended session; task failed",
+    );
+  }
+
   return async (message) => {
     if (message.kind === "USER") return handleUser(message);
     if (message.type === "SESSION_ENDED") return handleEnded(message);
-    // AWAIT_FIX arrives with Step Functions in M2 (§8.4a); acked so it never reaches the DLQ.
-    deps.logger.warn(
-      { sessionId: message.sessionId },
-      "AWAIT_FIX is not handled before M2; skipped",
-    );
+    return handleAwaitFix(message);
   };
 }

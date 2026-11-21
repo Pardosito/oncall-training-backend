@@ -1,3 +1,4 @@
+import type { SFNClient } from "@aws-sdk/client-sfn";
 import type { Express } from "express";
 import { createApp } from "./app.js";
 import type { Config } from "./config/index.js";
@@ -18,7 +19,11 @@ import {
   createKubernetesMockCluster,
   type MockClusterGateway,
 } from "./modules/mock-cluster/index.js";
-import { createDirectOrchestration, type Orchestration } from "./modules/orchestration/index.js";
+import {
+  createDirectOrchestration,
+  createStepFunctionsOrchestration,
+  type Orchestration,
+} from "./modules/orchestration/index.js";
 import {
   createS3ScenariosRepo,
   type ScenariosRepo,
@@ -52,6 +57,8 @@ export type Services = {
   scenarios: ScenariosRepo;
   queue: MessageQueue;
   cluster: MockClusterGateway;
+  /** Only needed with `ORCHESTRATION_MODE=stepfunctions`. */
+  sfn?: Pick<SFNClient, "send">;
 };
 
 /** Repos and the queue on real AWS clients (LocalStack locally, through `AWS_ENDPOINT_URL`). */
@@ -60,6 +67,7 @@ export function createAwsBackedServices(config: Config, logger: Logger, aws: Aws
     sessions: createDynamoSessionsRepo({ ddb: aws.ddbDoc, table: config.SESSIONS_TABLE }),
     scenarios: createS3ScenariosRepo({ s3: aws.s3, bucket: config.FILES_BUCKET, logger }),
     queue: createSqsQueue(aws.sqs),
+    sfn: aws.sfn,
   };
 }
 
@@ -86,13 +94,20 @@ export async function createMockCluster(
   return createFakeMockCluster({ baseline, clock });
 }
 
-/** Direct orchestration in the Nov 5 MVP (D-24); Step Functions arrives in M2 (BE-062). */
+/** Step Functions (M2, BE-062/063) or the direct orchestration of the Nov 5 MVP (D-24). */
 export function createOrchestration(services: Services): Orchestration {
   const { config } = services;
-  if (config.ORCHESTRATION_MODE !== "direct") {
-    throw new Error(
-      "ORCHESTRATION_MODE=stepfunctions is not implemented yet (M2, BE-062); set ORCHESTRATION_MODE=direct",
-    );
+  if (config.ORCHESTRATION_MODE === "stepfunctions") {
+    // loadConfig already requires STATE_MACHINE_ARN in this mode.
+    if (!services.sfn || !config.STATE_MACHINE_ARN) {
+      throw new Error("ORCHESTRATION_MODE=stepfunctions needs an SFN client and STATE_MACHINE_ARN");
+    }
+    return createStepFunctionsOrchestration({
+      sfn: services.sfn,
+      stateMachineArn: config.STATE_MACHINE_ARN,
+      sessions: services.sessions,
+      logger: services.logger,
+    });
   }
   return createDirectOrchestration({
     sessions: services.sessions,
@@ -162,6 +177,13 @@ export function startWorkerLoops(services: Services, signal: AbortSignal): Promi
       logger,
       signal,
     }),
-    runMonitor({ monitor: createMonitor(shared), logger, signal }),
+    runMonitor({
+      monitor: createMonitor({
+        ...shared,
+        enforceTimeouts: config.ORCHESTRATION_MODE === "direct",
+      }),
+      logger,
+      signal,
+    }),
   ];
 }

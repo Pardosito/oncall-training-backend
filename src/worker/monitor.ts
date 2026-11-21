@@ -25,6 +25,11 @@ export type MonitorDeps = {
   streaks: HealthStreakStore;
   clock: Clock;
   logger: Logger;
+  /**
+   * Direct mode only (D-24): fail sessions stuck in STARTING or past `maxResolveSeconds`. With
+   * Step Functions the state machine owns the timeouts (`WaitForFix` → TIMEOUT, infra §6.1).
+   */
+  enforceTimeouts?: boolean;
 };
 
 export type TickResult = "idle" | "timed-out" | "waiting" | "watching" | "resolved";
@@ -50,7 +55,7 @@ export function createMonitor(deps: MonitorDeps): { tick(): Promise<TickResult> 
       const key = { userId: session.userId, sessionId: session.sessionId };
       const now = deps.clock.now();
 
-      const timeout = timeoutOf(session, scenario);
+      const timeout = deps.enforceTimeouts === false ? undefined : timeoutOf(session, scenario);
       if (timeout && now >= timeout.at) {
         const result = await deps.orchestration.failTask({
           key,
