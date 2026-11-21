@@ -45,5 +45,18 @@ awslocal sqs create-queue --queue-name faults --attributes "{
 }" >/dev/null
 echo "queues: $(awslocal sqs list-queues --query 'QueueUrls' --output text)"
 
+# State machine (local copy of infra's statemachines/scenario.asl.json, BE-036); the ARN matches
+# STATE_MACHINE_ARN in .env.example. Updated in place on every start, so a new copy takes effect.
+SM_NAME=oncall-training-scenario
+SM_ARN=arn:aws:states:us-east-1:000000000000:stateMachine:$SM_NAME
+if awslocal stepfunctions describe-state-machine --state-machine-arn "$SM_ARN" >/dev/null 2>&1; then
+  awslocal stepfunctions update-state-machine --state-machine-arn "$SM_ARN" \
+    --definition file:///statemachine.asl.json >/dev/null
+else
+  awslocal stepfunctions create-state-machine --name "$SM_NAME" --type STANDARD \
+    --role-arn arn:aws:iam::000000000000:role/LabRole --definition file:///statemachine.asl.json >/dev/null
+fi
+echo "state machine: $SM_ARN"
+
 touch /tmp/oncall-ready
 echo "oncall-training local resources ready"

@@ -16,3 +16,18 @@ export const FaultMessageSchema = z.object({
   sentAt: IsoDateTimeSchema,
 });
 export type FaultMessage = z.infer<typeof FaultMessageSchema>;
+
+/** Step Functions execution input (ARCHITECTURE §8.1); the execution name is `sessionId`. */
+export const ExecutionInputSchema = z.object({
+  userId: z.string().min(1),
+  sessionId: UlidSchema,
+  scenarioId: z.string().min(1),
+  warmupSeconds: z.int().min(0),
+  maxResolveSeconds: z.int().min(1),
+  fault: z.object({
+    faultId: UlidSchema,
+    type: FaultTypeSchema,
+    target: z.object({ namespace: z.string().min(1), deployment: z.string().min(1) }),
+  }),
+});
+export type ExecutionInput = z.infer<typeof ExecutionInputSchema>;

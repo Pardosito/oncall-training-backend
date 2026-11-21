@@ -147,5 +147,26 @@ export function describeSessionsRepoContract(
       expect(active && active.sessionId >= newer.sessionId).toBe(true);
       expect(active?.state === "STARTING" || active?.state === "INCIDENT_ACTIVE").toBe(true);
     });
+
+    it("stores the task token while the session is active, and keeps it out of the session", async () => {
+      const session = newSession("INCIDENT_ACTIVE");
+      await repo.create(session);
+      expect(await repo.getTaskToken(session)).toBeUndefined();
+      expect(await repo.setTaskToken(session, "token-1", at(21))).toBe(true);
+      expect(await repo.getTaskToken(session)).toBe("token-1");
+      expect(await repo.get(session)).not.toHaveProperty("taskToken");
+    });
+
+    it("refuses a task token once the session ended", async () => {
+      const session = newSession();
+      await repo.create(session);
+      await repo.transition(session, { from: "STARTING", to: "FAILED", at: at(1) });
+      expect(await repo.setTaskToken(session, "token-1", at(2))).toBe(false);
+      expect(await repo.getTaskToken(session)).toBeUndefined();
+    });
+
+    it("refuses a task token for a missing session", async () => {
+      expect(await repo.setTaskToken(newSession(), "token-1", at(1))).toBe(false);
+    });
   });
 }

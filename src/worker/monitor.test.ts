@@ -19,8 +19,9 @@ let cluster: ReturnType<typeof createFakeMockCluster>;
 let fake: ReturnType<typeof createFakeOrchestration>;
 let clock: ReturnType<typeof createFixedClock>;
 
-function monitor(gateway: MockClusterGateway = cluster) {
+function monitor(gateway: MockClusterGateway = cluster, enforceTimeouts?: boolean) {
   return createMonitor({
+    enforceTimeouts,
     sessions,
     scenarios: createStaticScenariosRepo([scenario]),
     cluster: gateway,
@@ -91,6 +92,14 @@ describe("monitor tick", () => {
 
     expect(await monitor().tick()).toBe("timed-out");
     expect(fake.calls).toMatchObject([{ method: "failTask", input: { reason: "TIMEOUT" } }]);
+  });
+
+  it("leaves timeouts to the state machine with Step Functions", async () => {
+    await sessions.create(makeSession({ state: "INCIDENT_ACTIVE", faultInjectedAt: at(20) }));
+    clock.advance(20 + scenario.maxResolveSeconds);
+
+    expect(await monitor(cluster, false).tick()).not.toBe("timed-out");
+    expect(fake.calls).toEqual([]);
   });
 
   it("does not resolve a healthy system without a valid fix", async () => {

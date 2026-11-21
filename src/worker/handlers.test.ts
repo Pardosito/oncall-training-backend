@@ -159,6 +159,67 @@ describe("SESSION_ENDED", () => {
     expect((await deployment("orders"))?.desiredReplicas).toBe(2);
     expect(await streaks.record(session.sessionId, true)).toBe(1);
   });
+
+  it("doesn't reset while another session is running (late end of an abandoned one)", async () => {
+    const old = makeSession({ sessionId: "01JC0000000000000000000OLD", state: "FAILED" });
+    await sessions.create(old);
+    cluster.applyFault({ type: "SCALE_TO_ZERO", target: "orders" }); // the running session's fault
+
+    await handle({
+      kind: "SYSTEM",
+      type: "SESSION_ENDED",
+      sessionId: old.sessionId,
+      userId: old.userId,
+      outcome: "FAILED",
+      reason: "ABANDONED",
+    });
+
+    expect((await deployment("orders"))?.desiredReplicas).toBe(0);
+  });
+});
+
+describe("AWAIT_FIX", () => {
+  const awaitFix = (target: Session, taskToken = "token-1"): QueueMessage => ({
+    kind: "SYSTEM",
+    type: "AWAIT_FIX",
+    sessionId: target.sessionId,
+    userId: target.userId,
+    taskToken,
+  });
+
+  it("stores the task token on an active session", async () => {
+    await handle(awaitFix(session));
+
+    expect(await sessions.getTaskToken(session)).toBe("token-1");
+    expect(fake.calls).toEqual([]);
+  });
+
+  it("fails the task right away when the session already ended (abandoned in the warmup)", async () => {
+    const ended = makeSession({
+      sessionId: "01JC0000000000000000000END",
+      state: "FAILED",
+      failureReason: "ABANDONED",
+    });
+    await sessions.create(ended);
+
+    await handle(awaitFix(ended, "token-2"));
+
+    expect(await sessions.getTaskToken(ended)).toBeUndefined();
+    expect(fake.calls).toEqual([
+      {
+        method: "failTask",
+        input: expect.objectContaining({ taskToken: "token-2", reason: "ABANDONED" }) as unknown,
+      },
+    ]);
+  });
+
+  it("fails the task for an unknown session", async () => {
+    await handle(awaitFix(makeSession({ userId: "ghost" }), "token-3"));
+
+    expect(fake.calls).toEqual([
+      { method: "failTask", input: expect.objectContaining({ taskToken: "token-3" }) as unknown },
+    ]);
+  });
 });
 
 it("acks messages for unknown sessions", async () => {

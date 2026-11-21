@@ -25,7 +25,8 @@ import { runConsumer } from "./worker/consumer.js";
 /**
  * `pnpm dev:local` (D-29): api + worker + a fake injector in ONE process around one shared fake
  * cluster, so the whole MVP loop runs on a laptop with `MOCK_CLUSTER=fake`.
- *   pnpm dev:local              DynamoDB, S3 and SQS in LocalStack (`docker compose up -d`)
+ *   pnpm dev:local              DynamoDB, S3 and SQS in LocalStack (`docker compose up -d`);
+ *                               ORCHESTRATION_MODE=stepfunctions also uses its Step Functions
  *   pnpm dev:local --in-memory  no Docker at all: everything in memory, scenarios from ./scenarios
  * Never used in AWS: the image runs `api.js` / `worker.js`.
  */
@@ -40,7 +41,10 @@ if (inMemory) {
 }
 process.env.NODE_ENV ??= "development";
 process.env.AUTH_MODE ??= "dev";
-process.env.ORCHESTRATION_MODE = "direct";
+// In memory there's no Step Functions; against LocalStack, ORCHESTRATION_MODE=stepfunctions runs
+// the local copy of the state machine (local/statemachine.asl.json, BE-036).
+if (inMemory) process.env.ORCHESTRATION_MODE = "direct";
+else process.env.ORCHESTRATION_MODE ??= "direct";
 process.env.MOCK_CLUSTER = "fake";
 
 const { config, logger } = bootstrap("api");
