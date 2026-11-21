@@ -61,6 +61,13 @@ export type SessionsRepo = {
     by: { actions: number; wrong: number },
     at: Date,
   ): Promise<void>;
+  /**
+   * Stores the state machine's task token (`AWAIT_FIX`, D-13) while the session is active;
+   * returns false once it ended. The state machine removes it when it writes the end state.
+   */
+  setTaskToken(key: SessionKey, token: string, at: Date): Promise<boolean>;
+  /** The stored task token, if any. Never log it. */
+  getTaskToken(key: SessionKey): Promise<string | undefined>;
 };
 
 function assertTransition({ from, to }: Transition): void {
@@ -211,12 +218,47 @@ export function createDynamoSessionsRepo(deps: {
         }),
       );
     },
+
+    setTaskToken(key, token, at) {
+      return conditional(() =>
+        ddb.send(
+          new UpdateCommand({
+            TableName,
+            Key: Key(key),
+            UpdateExpression: "SET task_token = :token, updated_at = :at",
+            ConditionExpression: "#state IN (:starting, :active)",
+            ExpressionAttributeNames: { "#state": "state" },
+            ExpressionAttributeValues: {
+              ":token": token,
+              ":at": at.toISOString(),
+              ":starting": "STARTING",
+              ":active": "INCIDENT_ACTIVE",
+            },
+          }),
+        ),
+      );
+    },
+
+    async getTaskToken(key) {
+      const { Item } = await ddb.send(
+        new GetCommand({
+          TableName,
+          Key: Key(key),
+          ProjectionExpression: "task_token",
+          ConsistentRead: true,
+        }),
+      );
+      const token: unknown = Item?.task_token;
+      return typeof token === "string" ? token : undefined;
+    },
   };
 }
 
 /** In-memory implementation with the same conditions, for unit tests and `dev:local`. */
 export function createInMemorySessionsRepo(): SessionsRepo & { all(): Session[] } {
   const items = new Map<string, Session>();
+  // Kept apart from the items, like the real repo keeps `task_token` out of the domain session.
+  const tokens = new Map<string, string>();
   const id = ({ userId, sessionId }: SessionKey) => `${userId}#${sessionId}`;
   const copy = (s: Session): Session => ({ ...s });
 
@@ -287,6 +329,18 @@ export function createInMemorySessionsRepo(): SessionsRepo & { all(): Session[] 
       session.wrongActions += by.wrong;
       session.updatedAt = at.toISOString();
       return Promise.resolve();
+    },
+
+    setTaskToken(key, token, at) {
+      const session = items.get(id(key));
+      if (!session || !ACTIVE_STATES.includes(session.state)) return Promise.resolve(false);
+      tokens.set(id(key), token);
+      session.updatedAt = at.toISOString();
+      return Promise.resolve(true);
+    },
+
+    getTaskToken(key) {
+      return Promise.resolve(tokens.get(id(key)));
     },
   };
 }
