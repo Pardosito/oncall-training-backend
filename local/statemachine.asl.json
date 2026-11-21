@@ -1,0 +1,328 @@
+{
+  "Comment": "LOCAL COPY for LocalStack. Source of truth: oncall-training-infra statemachines/scenario.asl.json (rendered with scripts/sfn-render.sh and the LocalStack queue URLs). Do not edit here; re-render after every change there. oncall-training-scenario (ARCHITECTURE §6): warmup, inject the fault, wait for the fix, persist the end state, tell the worker the session ended. Queue URLs and the table name are filled by Terraform templatefile(); the rest is JSONata evaluated at run time.",
+  "QueryLanguage": "JSONata",
+  "StartAt": "Init",
+  "States": {
+    "Init": {
+      "Type": "Pass",
+      "Assign": {
+        "userId": "{% $states.input.userId %}",
+        "sessionId": "{% $states.input.sessionId %}",
+        "scenarioId": "{% $states.input.scenarioId %}",
+        "warmupSeconds": "{% $states.input.warmupSeconds %}",
+        "maxResolveSeconds": "{% $states.input.maxResolveSeconds %}",
+        "fault": "{% $states.input.fault %}",
+        "reason": null,
+        "error": null
+      },
+      "Next": "Warmup"
+    },
+    "Warmup": {
+      "Type": "Wait",
+      "Seconds": "{% $warmupSeconds %}",
+      "Next": "InjectFault"
+    },
+    "InjectFault": {
+      "Type": "Task",
+      "Comment": "FAULT (ARCHITECTURE §7). A duplicate send is safe: the injector is idempotent by faultId and only acts on a STARTING session.",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Arguments": {
+        "QueueUrl": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/faults",
+        "MessageBody": {
+          "faultId": "{% $fault.faultId %}",
+          "sessionId": "{% $sessionId %}",
+          "userId": "{% $userId %}",
+          "type": "{% $fault.type %}",
+          "target": "{% $fault.target %}",
+          "sentAt": "{% $now() %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "reason": "ERROR",
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "MarkFailed"
+        }
+      ],
+      "Output": {},
+      "Next": "WaitForFix"
+    },
+    "WaitForFix": {
+      "Type": "Task",
+      "Comment": "AWAIT_FIX with the task token (D-13). The worker calls SendTaskSuccess with the §6.3 output, or SendTaskFailure(error = Abandoned). No Retry: States.TaskFailed would also match Abandoned, and a retried send carries a new token while the FIFO dedup id drops the message, leaving the worker with the old one.",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Arguments": {
+        "QueueUrl": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/user-actions.fifo",
+        "MessageGroupId": "{% $sessionId %}",
+        "MessageDeduplicationId": "{% $sessionId & ':await-fix' %}",
+        "MessageBody": {
+          "kind": "SYSTEM",
+          "type": "AWAIT_FIX",
+          "sessionId": "{% $sessionId %}",
+          "userId": "{% $userId %}",
+          "taskToken": "{% $states.context.Task.Token %}"
+        }
+      },
+      "TimeoutSeconds": "{% $maxResolveSeconds %}",
+      "Assign": {
+        "result": "{% $states.result %}"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.Timeout"],
+          "Assign": {
+            "reason": "TIMEOUT",
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "MarkFailed"
+        },
+        {
+          "ErrorEquals": ["Abandoned"],
+          "Assign": {
+            "reason": "ABANDONED",
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "MarkFailed"
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "reason": "ERROR",
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "MarkFailed"
+        }
+      ],
+      "Output": {},
+      "Next": "PersistResolved"
+    },
+    "PersistResolved": {
+      "Type": "Task",
+      "Comment": "RESOLVED + score fields (backend §7.1, §8.2). wrong_actions and actions_count stay as the worker counted them.",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Arguments": {
+        "TableName": "Sessions",
+        "Key": {
+          "user_id": {
+            "S": "{% $userId %}"
+          },
+          "session_id": {
+            "S": "{% $sessionId %}"
+          }
+        },
+        "UpdateExpression": "SET #state = :resolved, score = :score, ttd_seconds = :ttd, ttr_seconds = :ttr, ended_at = :ended, updated_at = :now REMOVE task_token",
+        "ConditionExpression": "#state = :active",
+        "ExpressionAttributeNames": {
+          "#state": "state"
+        },
+        "ExpressionAttributeValues": {
+          ":resolved": {
+            "S": "RESOLVED"
+          },
+          ":active": {
+            "S": "INCIDENT_ACTIVE"
+          },
+          ":score": {
+            "N": "{% $string($result.score) %}"
+          },
+          ":ttd": {
+            "N": "{% $string($result.ttdSeconds) %}"
+          },
+          ":ttr": {
+            "N": "{% $string($result.ttrSeconds) %}"
+          },
+          ":ended": {
+            "S": "{% $exists($result.resolvedAt) ? $result.resolvedAt : $now() %}"
+          },
+          ":now": {
+            "S": "{% $now() %}"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "DynamoDB.ConditionalCheckFailedException",
+            "States.QueryEvaluationError"
+          ],
+          "MaxAttempts": 0
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "reason": "ERROR",
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "MarkFailed"
+        }
+      ],
+      "Output": {},
+      "Next": "NotifyEnded"
+    },
+    "NotifyEnded": {
+      "Type": "Task",
+      "Comment": "SESSION_ENDED outcome=RESOLVED (backend §8.4): the worker flushes logs and resets the mock system.",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Arguments": {
+        "QueueUrl": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/user-actions.fifo",
+        "MessageGroupId": "{% $sessionId %}",
+        "MessageDeduplicationId": "{% $sessionId & ':ended' %}",
+        "MessageBody": {
+          "kind": "SYSTEM",
+          "type": "SESSION_ENDED",
+          "sessionId": "{% $sessionId %}",
+          "userId": "{% $userId %}",
+          "outcome": "RESOLVED",
+          "reason": null
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "NotifyFailed"
+        }
+      ],
+      "Output": {},
+      "Next": "Resolved"
+    },
+    "Resolved": {
+      "Type": "Succeed"
+    },
+    "MarkFailed": {
+      "Type": "Task",
+      "Comment": "FAILED + reason. A failed condition (session already ended) still goes on to NotifyEndedFailed: every path sends SESSION_ENDED.",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Arguments": {
+        "TableName": "Sessions",
+        "Key": {
+          "user_id": {
+            "S": "{% $userId %}"
+          },
+          "session_id": {
+            "S": "{% $sessionId %}"
+          }
+        },
+        "UpdateExpression": "SET #state = :failed, failure_reason = :reason, ended_at = :now, updated_at = :now REMOVE task_token",
+        "ConditionExpression": "#state IN (:starting, :active)",
+        "ExpressionAttributeNames": {
+          "#state": "state"
+        },
+        "ExpressionAttributeValues": {
+          ":failed": {
+            "S": "FAILED"
+          },
+          ":starting": {
+            "S": "STARTING"
+          },
+          ":active": {
+            "S": "INCIDENT_ACTIVE"
+          },
+          ":reason": {
+            "S": "{% $reason %}"
+          },
+          ":now": {
+            "S": "{% $now() %}"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["DynamoDB.ConditionalCheckFailedException"],
+          "MaxAttempts": 0
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyEndedFailed"
+        }
+      ],
+      "Output": {},
+      "Next": "NotifyEndedFailed"
+    },
+    "NotifyEndedFailed": {
+      "Type": "Task",
+      "Comment": "SESSION_ENDED outcome=FAILED with the reason (backend §8.4).",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Arguments": {
+        "QueueUrl": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/user-actions.fifo",
+        "MessageGroupId": "{% $sessionId %}",
+        "MessageDeduplicationId": "{% $sessionId & ':ended' %}",
+        "MessageBody": {
+          "kind": "SYSTEM",
+          "type": "SESSION_ENDED",
+          "sessionId": "{% $sessionId %}",
+          "userId": "{% $userId %}",
+          "outcome": "FAILED",
+          "reason": "{% $reason %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "error": "{% $states.errorOutput %}"
+          },
+          "Next": "NotifyFailed"
+        }
+      ],
+      "Output": {},
+      "Next": "Failed"
+    },
+    "Failed": {
+      "Type": "Fail",
+      "Error": "{% $reason %}",
+      "Cause": "{% $error = null ? 'Session failed: ' & $reason : $string($error) %}"
+    },
+    "NotifyFailed": {
+      "Type": "Fail",
+      "Comment": "SESSION_ENDED couldn't be sent after retries. The worker's lock TTL and the backend's stale-session check are the fallback (backend §11).",
+      "Error": "NotifyFailed",
+      "Cause": "{% $string($error) %}"
+    }
+  }
+}

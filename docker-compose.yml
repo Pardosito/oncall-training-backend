@@ -6,11 +6,13 @@ services:
     ports:
       - "4566:4566"
     environment:
-      SERVICES: dynamodb,s3,sqs
+      # sts + iam: the Step Functions service integrations need them inside LocalStack.
+      SERVICES: dynamodb,s3,sqs,stepfunctions,sts,iam
       AWS_DEFAULT_REGION: us-east-1
     volumes:
       - ./local/init/ready.d:/etc/localstack/init/ready.d:ro
       - ./scenarios:/scenarios:ro
+      - ./local/statemachine.asl.json:/statemachine.asl.json:ro
     healthcheck:
       # Healthy only once the init script has created every resource.
       test: ["CMD", "test", "-f", "/tmp/oncall-ready"]
