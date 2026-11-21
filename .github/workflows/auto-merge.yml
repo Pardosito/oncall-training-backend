@@ -1,0 +1,71 @@
+# PRs that Pardosito opens into main are approved and squash-merged once every other check on
+# the exact head commit is green. Nothing from the PR is checked out or run here, so
+# pull_request_target is safe. `edited` covers a stacked PR whose base becomes main.
+# Needs "Allow GitHub Actions to create and approve pull requests" in Settings → Actions.
+name: auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+    branches: [main]
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+  statuses: read
+
+jobs:
+  merge:
+    name: approve and merge
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login == 'Pardosito' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # No branch protection lists required checks, so wait for every check except this workflow.
+      # A new push cancels this run (concurrency) and starts a fresh one.
+      - name: Wait for every check to pass
+        run: |
+          sleep 30 # let the CI runs register their checks
+          deadline=$((SECONDS + 40 * 60))
+          while :; do
+            checks="$(gh pr checks "$PR" --json name,bucket,workflow \
+              --jq '[.[] | select(.workflow != "auto-merge")]' || true)"
+            if jq -e 'any(.[]; .bucket == "fail" or .bucket == "cancel")' >/dev/null <<<"$checks"; then
+              echo "::error::A check failed; not merging."
+              jq -r '.[] | select(.bucket == "fail" or .bucket == "cancel") | "  \(.name): \(.bucket)"' <<<"$checks"
+              exit 1
+            fi
+            if jq -e 'length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")' >/dev/null <<<"$checks"; then
+              jq -r '.[] | "  \(.name): \(.bucket)"' <<<"$checks"
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Checks still pending after 40 min."
+              exit 1
+            fi
+            sleep 30
+          done
+      - name: Approve
+        run: |
+          gh pr review "$PR" --approve --body "Auto-approved: every check passed on ${SHA::7}."
+      # --match-head-commit: only the commit the checks just validated can be merged.
+      - name: Squash-merge
+        run: gh pr merge "$PR" --squash --delete-branch --match-head-commit "$SHA"
+      # Merges made with GITHUB_TOKEN don't fire push events, so start CI on main explicitly.
+      - name: Start CI on main
+        run: |
+          gh workflow run ci.yml --ref main || echo "::notice::ci.yml can't be dispatched on main yet."

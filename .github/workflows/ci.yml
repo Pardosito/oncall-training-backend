@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # auto-merge.yml starts this run on main after each merge (GITHUB_TOKEN merges fire no push).
+  workflow_dispatch:
 
 jobs:
   check:
