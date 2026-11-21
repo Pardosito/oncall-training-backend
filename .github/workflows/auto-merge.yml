@@ -64,7 +64,18 @@ jobs:
           gh pr review "$PR" --approve --body "Auto-approved: every check passed on ${SHA::7}."
       # --match-head-commit: only the commit the checks just validated can be merged.
       - name: Squash-merge
-        run: gh pr merge "$PR" --squash --delete-branch --match-head-commit "$SHA"
+        run: gh pr merge "$PR" --squash --match-head-commit "$SHA"
+      # Deleting a branch through the API closes the PRs based on it, so move them to main first.
+      # A stacked PR may then need main merged in (the squash rewrote its parent's commits).
+      - name: Retarget stacked PRs, then delete the branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          for n in $(gh pr list --base "$HEAD_REF" --state open --json number --jq '.[].number'); do
+            gh pr edit "$n" --base main
+            echo "retargeted #$n to main"
+          done
+          gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$HEAD_REF"
       # Merges made with GITHUB_TOKEN don't fire push events, so start CI on main explicitly.
       - name: Start CI on main
         run: |
