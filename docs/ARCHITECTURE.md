@@ -101,7 +101,7 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
    5. If step 2 or 4 fails, the API marks the session `FAILED`, releases the lock and returns 500.
    6. Returns **201** `{ sessionId }`.
 2. **Warmup and fault**: Step Functions waits `warmupSeconds`, then sends the fault to SQS `faults`. The injector (infra repo) applies it and updates the session (§8.3) → `INCIDENT_ACTIVE`.
-3. **Wait for fix**: Step Functions state `WaitForFix` (DynamoDB `updateItem.waitForTaskToken`) stores `task_token` on the item and waits up to `maxResolveSeconds`.
+3. **Wait for fix**: Step Functions state `WaitForFix` sends `AWAIT_FIX` with its task token to `user-actions` (`sqs:sendMessage.waitForTaskToken`, infra D-13). The worker stores `task_token` on the item, and the execution waits up to `maxResolveSeconds`.
 4. **User acts**: the SPA polls the dashboard. The user acknowledges, views logs and applies actions (§5). Actions are enqueued and the worker applies them in order (FIFO, group = sessionId).
 5. **Resolution** (worker monitor loop): if the session is `INCIDENT_ACTIVE`, a valid fix was applied (`valid_fix_applied_at` set) and **every** mock service is healthy on 2 consecutive checks, then:
    1. compute TTD, TTR and score (`scoring`)
@@ -115,7 +115,7 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
    4. releases the lock **only if it still holds this sessionId** (compare-and-delete Lua script)
    5. deletes the hot Redis keys
 
-**Abandon**: `POST /api/sessions/:id/abandon` enqueues `ABANDON`. The worker calls `SendTaskFailure(task_token, "Abandoned")`, and the Step Functions failure branch continues from step 6.
+**Abandon**: `POST /api/sessions/:id/abandon` enqueues `ABANDON`. The worker calls `SendTaskFailure(task_token, "Abandoned")`, and the Step Functions failure branch continues from step 6. Before the token exists (during the warmup) the worker writes `FAILED`/`ABANDONED` itself and answers the later `AWAIT_FIX` with the failure (D-32).
 
 **MVP mode (Nov 5 → Nov 19, DECISIONS D-24, D-29–D-31):** steps 1–7 run without Step Functions or Redis. There's no lock or task token.
 
@@ -356,7 +356,7 @@ Sent on **every** terminal path (success, timeout, abandon, error):
 
 ### 8.4a `AWAIT_FIX` system message (state machine → `user-actions`, M2)
 
-Infra D-13 replaced the DynamoDB `waitForTaskToken` of §4.2 step 3 with `sqs:sendMessage.waitForTaskToken`: the `WaitForFix` state sends `{ "kind": "SYSTEM", "type": "AWAIT_FIX", "sessionId", "userId", "taskToken" }` (dedup `<sessionId>:await-fix`) and the worker stores the token. `QueueMessageSchema` already accepts it so it never lands in the DLQ; the handler comes with Step Functions in M2. Not sent in the Nov 5 MVP.
+Infra D-13 replaced the DynamoDB `waitForTaskToken` of §4.2 step 3 with `sqs:sendMessage.waitForTaskToken`: the `WaitForFix` state sends `{ "kind": "SYSTEM", "type": "AWAIT_FIX", "sessionId", "userId", "taskToken" }` (dedup `<sessionId>:await-fix`) and the worker stores the token. The worker stores the token while the session is active. For an ended or unknown session it answers at once with `SendTaskFailure(Abandoned)`, so the execution still sends `SESSION_ENDED` (D-32). Not sent in direct mode.
 
 ### 8.5 `user-actions` message (api → worker)
 
