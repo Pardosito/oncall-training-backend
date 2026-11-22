@@ -25,9 +25,9 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 | D-08 | 2026-10-22 | The worker runs as a single replica                                                                                                       | Decided                          |
 | D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                                                                              | Decided                          |
 | D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                                                                                  | Decided                          |
-| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path                                                             | **Proposed** (infra)             |
-| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`                                                             | **Proposed** (infra)             |
-| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                                                                         | **Proposed** (infra)             |
+| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path                                                             | Decided                          |
+| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`                                                             | Decided                          |
+| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                                                                         | Decided                          |
 | D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                                                                                | Decided                          |
 | D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                                                                                | Decided                          |
 | D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404                                                              | Decided                          |
@@ -101,20 +101,23 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 **Why:** scoring is business logic that needs unit tests and will change. In TypeScript it's a pure function with tests. Step Functions just persists the result it receives in the task output. Without this, we'd need a Lambda (another deploy unit) or complex ASL intrinsic functions.
 
-### D-11 · `SESSION_ENDED` system message (Proposed, needs infra)
+### D-11 · `SESSION_ENDED` system message
 
 **Why:** cleanup (flush logs, reset the mock system, release the lock) must happen on **every** ending: success, timeout, abandon or error. Several of those endings happen inside Step Functions, where the backend can't see them. If Step Functions sends one message on all terminal paths, cleanup has exactly one code path, in the worker.
 **Alternative:** the worker periodically checks for ended sessions (slower, more code).
+**Confirmed by infra (2026-11-21):** every terminal path of `scenario.asl.json` sends `SESSION_ENDED` (infra D-29; `make lint-sfn` checks it).
 
-### D-12 · The injector updates the session (Proposed, needs infra)
+### D-12 · The injector updates the session
 
 **Why:** TTD and TTR are measured from the moment the fault is **actually applied**, and only the injector knows that moment. A conditional update (`state = STARTING`) makes it idempotent.
 **Consequence:** `faults` messages must carry `userId` and `sessionId`, and the injector needs DynamoDB and Redis access (LabRole already allows it).
+**Confirmed by infra (2026-11-21):** the injector's record step does the conditional update; the Redis `FAULT_INJECTED` event is infra INF-100.
 
-### D-13 · FIFO `user-actions` queue (Proposed, needs infra)
+### D-13 · FIFO `user-actions` queue
 
 **Why:** action order matters within a session ("scale to 0" then "scale to 2" ≠ the reverse). FIFO with `MessageGroupId = sessionId` guarantees order per session and adds dedup by `actionId`.
 **Trade-off:** lower throughput than standard queues, which is irrelevant at our scale.
+**Confirmed by infra (2026-11-21):** `oncall-training-user-actions.fifo` (+ DLQ) in the foundation stack.
 
 ### D-14 · Polling instead of push
 
@@ -277,10 +280,10 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 ## 5. Open questions
 
-| ID   | Question                                                                                                                                                                                                                                                                   | Owner | Blocks             |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------ |
-| O-01 | Infra agrees to D-11, D-12, D-13 and the RBAC in ARCHITECTURE §8.6?                                                                                                                                                                                                        | Ian   | Week 4 integration |
-| O-02 | ~~Does LocalStack Step Functions support `dynamodb:updateItem.waitForTaskToken`?~~ **Answered (2026-11-21):** moot after infra D-13 (the wait is `sqs:sendMessage.waitForTaskToken`). LocalStack 4.4 runs the JSONata state machine with it, with `sts,iam` enabled (D-32) | JP    | —                  |
-| O-03 | ~~Who rolls out new images to EKS?~~ **Answered (2026-11-01):** this repo pushes to ECR (`release.yml`); infra rolls out with `make deploy` (infra D-18)                                                                                                                   | Both  | —                  |
-| O-04 | Which Cognito claim do we show on the leaderboard (`preferred_username`, `nickname`)? Is it in the access token or do we need the ID token?                                                                                                                                | JP    | Leaderboard        |
-| O-05 | ~~ElastiCache with TLS and/or AUTH token?~~ **Answered (2026-11-01):** TLS, no AUTH token (infra D-09) → `REDIS_URL=rediss://<host>:6379`                                                                                                                                  | Ian   | —                  |
+| ID   | Question                                                                                                                                                                                                                                                                   | Owner | Blocks      |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ----------- |
+| O-01 | ~~Infra agrees to D-11, D-12, D-13 and the RBAC in ARCHITECTURE §8.6?~~ **Answered (2026-11-21):** yes; D-11–D-13 decided, RBAC as in §8.6 (infra ARCHITECTURE §5.2)                                                                                                       | Ian   | —           |
+| O-02 | ~~Does LocalStack Step Functions support `dynamodb:updateItem.waitForTaskToken`?~~ **Answered (2026-11-21):** moot after infra D-13 (the wait is `sqs:sendMessage.waitForTaskToken`). LocalStack 4.4 runs the JSONata state machine with it, with `sts,iam` enabled (D-32) | JP    | —           |
+| O-03 | ~~Who rolls out new images to EKS?~~ **Answered (2026-11-01):** this repo pushes to ECR (`release.yml`); infra rolls out with `make deploy` (infra D-18)                                                                                                                   | Both  | —           |
+| O-04 | Which Cognito claim do we show on the leaderboard (`preferred_username`, `nickname`)? Is it in the access token or do we need the ID token?                                                                                                                                | JP    | Leaderboard |
+| O-05 | ~~ElastiCache with TLS and/or AUTH token?~~ **Answered (2026-11-01):** TLS, no AUTH token (infra D-09) → `REDIS_URL=rediss://<host>:6379`                                                                                                                                  | Ian   | —           |
