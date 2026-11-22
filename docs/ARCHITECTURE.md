@@ -380,8 +380,8 @@ All `user-actions` messages are parsed by `QueueMessageSchema` (`modules/actions
 ### 8.6 What the infra repo provides
 
 - Kubernetes RBAC in namespace `mock`:
-  - **`api` ServiceAccount**: `get,list,watch` on `pods`, `deployments`; `get` on `pods/log`.
-  - **`worker` ServiceAccount**: the same, plus `patch` on `deployments` and `deployments/scale`.
+  - **`app/backend-api` ServiceAccount** (Role `mock-reader`): `get,list,watch` on `pods`, `deployments`; `get` on `pods/log`.
+  - **`app/backend-worker` ServiceAccount** (Role `mock-operator`): the same, plus `patch` on `deployments` and `deployments/scale`.
 - NetworkPolicy: `app` → `mock` on the services' HTTP port (health checks).
 - Env vars from §9 via ConfigMap; the images `api`/`worker` = this repo's image at a git-SHA tag.
 - ALB health check on `/healthz`; CloudFront `/api/*` → ALB.
