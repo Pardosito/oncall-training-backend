@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeSession } from "../../test-support/sessions.js";
-import { latestEndOf, STARTING_GRACE_SECONDS, timeoutOf } from "./sessions.timeouts.js";
+import { latestEndOf, lockTtlMs, STARTING_GRACE_SECONDS, timeoutOf } from "./sessions.timeouts.js";
 
 const scenario = { warmupSeconds: 20, maxResolveSeconds: 600 };
 const created = "2026-11-05T18:00:00.000Z";
@@ -33,5 +33,12 @@ describe("latestEndOf", () => {
     expect(latestEndOf(makeSession({ createdAt: created }), scenario)).toEqual(
       plus(20 + STARTING_GRACE_SECONDS + 600),
     );
+  });
+});
+
+describe("lockTtlMs", () => {
+  it("is warmup + max resolve time + 180 s, in ms", () => {
+    expect(lockTtlMs({ warmupSeconds: 20, maxResolveSeconds: 600 })).toBe(800_000);
+    expect(lockTtlMs({ warmupSeconds: 0, maxResolveSeconds: 1 })).toBe(181_000);
   });
 });

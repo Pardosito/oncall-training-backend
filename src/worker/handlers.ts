@@ -1,4 +1,5 @@
 import type { Clock } from "../platform/clock.js";
+import type { Lock } from "../platform/lock.js";
 import type { Logger } from "../platform/logger.js";
 import {
   isPenalized,
@@ -22,6 +23,8 @@ export type HandlerDeps = {
   streaks: HealthStreakStore;
   clock: Clock;
   logger: Logger;
+  /** The global lock, when Redis is configured; released on `SESSION_ENDED`. */
+  lock?: Lock;
 };
 
 /**
@@ -106,23 +109,46 @@ export function createMessageHandler(deps: HandlerDeps): (message: QueueMessage)
           at: now,
         });
         log.info({ result }, "session abandoned");
+        // D-32: abandoned during the warmup, the session ends now but its SESSION_ENDED only
+        // comes when the execution does. Free the lock now so a new session can start; the
+        // monitor resets the mock system to baseline during the new session's warmup anyway.
+        if (result === "ok" && session.state === "STARTING" && deps.lock) {
+          await deps.lock.release(session.sessionId);
+        }
         return;
       }
     }
   }
 
-  /** §4.2 step 7: reset the mock system to the scenario baseline and drop per-session state. */
+  /**
+   * §4.2 step 7: reset the mock system to the scenario baseline, drop per-session state, then
+   * release the lock. A failed reset throws before the release: the message is retried and the
+   * lock keeps the next session from starting on a broken system (after 3 tries the message goes
+   * to the DLQ and the lock's TTL frees it). The release is compare-and-delete, so a late or
+   * redelivered message can't free a lock the next session holds.
+   */
   async function handleEnded(message: Extract<SystemMessage, { type: "SESSION_ENDED" }>) {
     const log = deps.logger.child({ sessionId: message.sessionId });
+    await endSession(message, log);
+    if (deps.lock && (await deps.lock.release(message.sessionId))) log.info("lock released");
+  }
+
+  async function endSession(
+    message: Extract<SystemMessage, { type: "SESSION_ENDED" }>,
+    log: Logger,
+  ): Promise<void> {
     await deps.streaks.clear(message.sessionId);
     const loaded = await load(message);
     if (!loaded) return;
     // A late SESSION_ENDED (a session abandoned during its warmup ends when its execution
-    // does) must not undo the fault of the session that started since.
-    const active = await deps.sessions.findActive();
-    if (active && active.sessionId !== message.sessionId) {
+    // does) must not undo the fault of the session that started since. With Redis the lock
+    // holder is that session; without it (MVP) a scan finds it (D-30).
+    const activeSessionId = deps.lock
+      ? await deps.lock.holder()
+      : ((await deps.sessions.findActive())?.sessionId ?? null);
+    if (activeSessionId && activeSessionId !== message.sessionId) {
       log.warn(
-        { activeSessionId: active.sessionId, outcome: message.outcome },
+        { activeSessionId, outcome: message.outcome },
         "session ended while another one is running; mock system not reset",
       );
       return;

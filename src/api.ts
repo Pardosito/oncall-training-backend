@@ -1,7 +1,13 @@
 import { createAwsClients, createAwsReadinessChecks, destroyAwsClients } from "./platform/aws.js";
 import { systemClock } from "./platform/clock.js";
 import { bootstrap, closeServer, onShutdownSignal } from "./platform/process.js";
-import { buildApiApp, createAwsBackedServices, createMockCluster } from "./runtime.js";
+import { closeRedis } from "./platform/redis.js";
+import {
+  buildApiApp,
+  createAwsBackedServices,
+  createMockCluster,
+  createRedisServices,
+} from "./runtime.js";
 
 /** In-flight requests get this long to finish after SIGTERM (k8s grace period is 30 s). */
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -9,15 +15,17 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 const { config, logger } = bootstrap("api");
 const aws = createAwsClients(config);
 const backed = createAwsBackedServices(config, logger, aws);
+const { redis, lock, readinessChecks: redisChecks } = createRedisServices(config, logger);
 const services = {
   config,
   logger,
   clock: systemClock,
   ...backed,
   cluster: await createMockCluster(config, backed.scenarios),
+  ...(lock ? { lock } : {}),
 };
 
-const app = buildApiApp(services, createAwsReadinessChecks(aws, config));
+const app = buildApiApp(services, [...createAwsReadinessChecks(aws, config), ...redisChecks]);
 
 const server = app.listen(config.PORT, () => {
   logger.info(
@@ -35,4 +43,5 @@ const server = app.listen(config.PORT, () => {
 onShutdownSignal(logger, async () => {
   await closeServer(server, SHUTDOWN_TIMEOUT_MS);
   destroyAwsClients(aws);
+  if (redis) await closeRedis(redis);
 });
