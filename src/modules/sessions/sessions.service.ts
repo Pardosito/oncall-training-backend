@@ -48,8 +48,13 @@ export function createSessionsService(deps: {
   }
 
   /** §4.2 step 1: take the lock for this session, or 409 with the lock's remaining TTL. */
-  async function acquireLock(lock: Lock, sessionId: string, scenario: Scenario): Promise<void> {
-    if (await lock.acquire(sessionId, lockTtlMs(scenario))) return;
+  async function acquireLock(
+    lock: Lock,
+    sessionId: string,
+    userId: string,
+    scenario: Scenario,
+  ): Promise<void> {
+    if (await lock.acquire(sessionId, lockTtlMs(scenario), userId)) return;
     throw busy((await lock.remainingMs()) / 1000);
   }
 
@@ -59,7 +64,7 @@ export function createSessionsService(deps: {
       const scenario = await deps.scenarios.get(scenarioId);
       if (!scenario) throw notFound("Scenario not found.");
       const sessionId = newId();
-      if (deps.lock) await acquireLock(deps.lock, sessionId, scenario);
+      if (deps.lock) await acquireLock(deps.lock, sessionId, user.userId, scenario);
       else await assertNoActiveSession();
 
       const now = deps.clock.now();

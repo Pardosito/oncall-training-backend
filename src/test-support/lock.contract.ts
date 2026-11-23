@@ -54,13 +54,26 @@ export function describeLockContract(
       expect(await lock.acquire("s-2", 5_000)).toBe(true);
     });
 
+    it("keeps the owner next to the holder, and drops it on release", async () => {
+      expect(await lock.current()).toBeNull();
+      await lock.acquire("s-1", 5_000, "user-1");
+      expect(await lock.current()).toEqual({ sessionId: "s-1", userId: "user-1" });
+      expect(await lock.acquire("s-2", 5_000, "user-2")).toBe(false);
+      expect(await lock.current()).toEqual({ sessionId: "s-1", userId: "user-1" });
+      await lock.release("s-1");
+      expect(await lock.current()).toBeNull();
+      await lock.acquire("s-3", 5_000);
+      expect(await lock.current()).toEqual({ sessionId: "s-3" });
+    });
+
     it("frees itself when the TTL expires, and the old holder can't release the new one", async () => {
-      await lock.acquire("s-1", 150);
+      await lock.acquire("s-1", 150, "user-1");
       await advance(300);
       expect(await lock.holder()).toBeNull();
-      expect(await lock.acquire("s-2", 5_000)).toBe(true);
+      expect(await lock.current()).toBeNull();
+      expect(await lock.acquire("s-2", 5_000, "user-2")).toBe(true);
       expect(await lock.release("s-1")).toBe(false);
-      expect(await lock.holder()).toBe("s-2");
+      expect(await lock.current()).toEqual({ sessionId: "s-2", userId: "user-2" });
     });
   });
 }

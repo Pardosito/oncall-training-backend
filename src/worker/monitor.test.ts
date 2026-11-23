@@ -3,7 +3,12 @@ import { createFixedClock } from "../platform/clock.js";
 import { createLogger } from "../platform/logger.js";
 import { ordersDownScenario } from "../test-support/scenarios.js";
 import { makeSession, T0 } from "../test-support/sessions.js";
-import { createInMemoryHealthStreakStore } from "../modules/dashboard/index.js";
+import {
+  createInMemoryHealthStreakStore,
+  createInMemorySnapshotStore,
+  DashboardSnapshotSchema,
+} from "../modules/dashboard/index.js";
+import { createInMemoryLock } from "../platform/lock.js";
 import { createEventRecorder, createInMemoryEventLog } from "../modules/events/index.js";
 import { createFakeMockCluster, type MockClusterGateway } from "../modules/mock-cluster/index.js";
 import { createFakeOrchestration } from "../modules/orchestration/index.js";
@@ -205,5 +210,111 @@ describe("runMonitor", () => {
     await runMonitor({ monitor: { tick }, logger, signal: controller.signal, intervalMs: 1 });
 
     expect(tick).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("monitor with Redis (lock + snapshots)", () => {
+  const redisMonitor = (
+    lock: ReturnType<typeof createInMemoryLock>,
+    snapshots = createInMemorySnapshotStore(logger),
+    gateway: MockClusterGateway = cluster,
+  ) =>
+    createMonitor({
+      sessions,
+      scenarios: createStaticScenariosRepo([scenario]),
+      cluster: gateway,
+      orchestration: fake.orchestration,
+      streaks: createInMemoryHealthStreakStore(),
+      clock,
+      logger,
+      lock,
+      snapshots,
+      enforceTimeouts: false,
+    });
+
+  it("is idle without a lock: no scan and no k8s calls", async () => {
+    await sessions.create(makeSession({ state: "INCIDENT_ACTIVE", faultInjectedAt: at(20) }));
+    const scan = vi.spyOn(sessions, "findActive");
+    const listDeployments = vi.fn(() => cluster.listDeployments());
+
+    const result = await redisMonitor(createInMemoryLock(clock), undefined, {
+      ...cluster,
+      listDeployments,
+    }).tick();
+
+    expect(result).toBe("idle");
+    expect(scan).not.toHaveBeenCalled();
+    expect(listDeployments).not.toHaveBeenCalled();
+  });
+
+  it("reads the lock holder's session by its owner, without a scan", async () => {
+    const session = makeSession({ state: "INCIDENT_ACTIVE", faultInjectedAt: at(20) });
+    await sessions.create(session);
+    const lock = createInMemoryLock(clock);
+    await lock.acquire(session.sessionId, 600_000, session.userId);
+    const scan = vi.spyOn(sessions, "findActive");
+    clock.advance(30);
+
+    expect(await redisMonitor(lock).tick()).toBe("watching");
+    expect(scan).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the scan for a lock without an owner", async () => {
+    const session = makeSession({ state: "INCIDENT_ACTIVE", faultInjectedAt: at(20) });
+    await sessions.create(session);
+    const lock = createInMemoryLock(clock);
+    await lock.acquire(session.sessionId, 600_000);
+    const scan = vi.spyOn(sessions, "findActive");
+    clock.advance(30);
+
+    expect(await redisMonitor(lock).tick()).toBe("watching");
+    expect(scan).toHaveBeenCalledOnce();
+  });
+
+  it("is idle while the lock is held by a session that already ended (cleanup pending)", async () => {
+    const session = makeSession({ state: "RESOLVED", faultInjectedAt: at(20), endedAt: at(60) });
+    await sessions.create(session);
+    const lock = createInMemoryLock(clock);
+    await lock.acquire(session.sessionId, 600_000, session.userId);
+
+    expect(await redisMonitor(lock).tick()).toBe("idle");
+  });
+
+  it("stores a valid snapshot every tick, during the warmup too", async () => {
+    const session = makeSession();
+    await sessions.create(session);
+    const lock = createInMemoryLock(clock);
+    await lock.acquire(session.sessionId, 600_000, session.userId);
+    const snapshots = createInMemorySnapshotStore(logger);
+    clock.advance(10);
+
+    expect(await redisMonitor(lock, snapshots).tick()).toBe("waiting");
+    const stored = await snapshots.get(session.sessionId);
+    expect(DashboardSnapshotSchema.parse(stored)).toMatchObject({
+      sessionId: session.sessionId,
+      state: "STARTING",
+      generatedAt: at(10),
+      availableActions: ["ACKNOWLEDGE"],
+    });
+    expect(stored?.services.map((s) => s.name)).toEqual(scenario.targets);
+  });
+
+  it("still resolves when the snapshot can't be stored", async () => {
+    const session = makeSession({
+      state: "INCIDENT_ACTIVE",
+      faultInjectedAt: at(20),
+      validFixAppliedAt: at(40),
+    });
+    await sessions.create(session);
+    const lock = createInMemoryLock(clock);
+    await lock.acquire(session.sessionId, 600_000, session.userId);
+    const snapshots = createInMemorySnapshotStore(logger);
+    vi.spyOn(snapshots, "put").mockRejectedValue(new Error("redis down"));
+    const m = redisMonitor(lock, snapshots);
+    clock.advance(42);
+
+    expect(await m.tick()).toBe("watching");
+    clock.advance(2);
+    expect(await m.tick()).toBe("resolved");
   });
 });

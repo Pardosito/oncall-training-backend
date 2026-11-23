@@ -141,7 +141,7 @@ describe("startSession with the global lock", () => {
     const ctx = setup({ lock: true });
     const session = await ctx.service.startSession(user, "orders-down");
 
-    expect(await ctx.lock?.holder()).toBe(session.sessionId);
+    expect(await ctx.lock?.current()).toEqual({ sessionId: session.sessionId, userId: "user-a" });
     const scenario = ordersDownScenario();
     expect(await ctx.lock?.remainingMs()).toBe(
       (scenario.warmupSeconds + scenario.maxResolveSeconds + 180) * 1000,

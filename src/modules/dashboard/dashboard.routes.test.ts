@@ -1,5 +1,5 @@
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../app.js";
 import { createFixedClock } from "../../platform/clock.js";
 import { createLogger } from "../../platform/logger.js";
@@ -15,12 +15,17 @@ import { allServicesUp, observeMockSystem } from "./dashboard.observe.js";
 import { dashboardRouter } from "./dashboard.routes.js";
 import { DashboardSnapshotSchema, type DashboardSnapshot } from "./dashboard.schemas.js";
 import { createDashboardService } from "./dashboard.service.js";
+import { createInMemorySnapshotStore, type SnapshotStore } from "./dashboard.snapshots.js";
 
 const scenario = ordersDownScenario();
 let sessions: ReturnType<typeof createInMemorySessionsRepo>;
 let cluster: ReturnType<typeof createFakeMockCluster>;
 
-function makeApp(gateway: MockClusterGateway = cluster, events?: EventLog) {
+function makeApp(
+  gateway: MockClusterGateway = cluster,
+  events?: EventLog,
+  snapshots?: SnapshotStore,
+) {
   const logger = createLogger({ level: "silent" });
   const clock = createFixedClock(T0);
   clock.advance(90);
@@ -31,6 +36,7 @@ function makeApp(gateway: MockClusterGateway = cluster, events?: EventLog) {
     clock,
     logger,
     ...(events ? { events } : {}),
+    ...(snapshots ? { snapshots } : {}),
   });
   return createApp({
     logger,
@@ -57,6 +63,64 @@ async function snapshot(app: ReturnType<typeof makeApp>, session: Session, user 
     .set("x-dev-user", user);
   return { status: res.status, body: bodyOf<DashboardSnapshot>(res), headers: res.headers };
 }
+
+describe("GET /api/sessions/:id/dashboard with stored snapshots", () => {
+  const silent = createLogger({ level: "silent" });
+  const faultAt = new Date(T0.getTime() + 20_000).toISOString();
+  const stored = (session: Session, state: Session["state"]): DashboardSnapshot => ({
+    sessionId: session.sessionId,
+    state,
+    generatedAt: new Date(T0.getTime() + 88_000).toISOString(),
+    elapsedSeconds: 68,
+    services: [],
+    recentEvents: [],
+    availableActions: [],
+  });
+
+  it("serves the monitor's snapshot without reading the cluster", async () => {
+    const session = await given({ state: "INCIDENT_ACTIVE", faultInjectedAt: faultAt });
+    const snapshots = createInMemorySnapshotStore(silent);
+    await snapshots.put(stored(session, "INCIDENT_ACTIVE"));
+    const listDeployments = vi.fn(() => cluster.listDeployments());
+
+    const { body } = await snapshot(
+      makeApp({ ...cluster, listDeployments }, undefined, snapshots),
+      session,
+    );
+
+    expect(body).toEqual(stored(session, "INCIDENT_ACTIVE"));
+    expect(listDeployments).not.toHaveBeenCalled();
+  });
+
+  it("builds it live when the stored one is from before a state change, missing or invalid", async () => {
+    const session = await given({ state: "INCIDENT_ACTIVE", faultInjectedAt: faultAt });
+    const snapshots = createInMemorySnapshotStore(silent);
+    await snapshots.put(stored(session, "STARTING"));
+    const app = makeApp(cluster, undefined, snapshots);
+    expect((await snapshot(app, session)).body.elapsedSeconds).toBe(70);
+
+    snapshots.putRaw(session.sessionId, JSON.stringify({ sessionId: session.sessionId }));
+    expect((await snapshot(app, session)).body.services).toHaveLength(3);
+
+    await snapshots.clear(session.sessionId);
+    expect((await snapshot(app, session)).body.services).toHaveLength(3);
+  });
+
+  it("ignores it for an ended session and on a Redis error", async () => {
+    const ended = await given({ state: "RESOLVED", faultInjectedAt: faultAt, endedAt: faultAt });
+    const snapshots = createInMemorySnapshotStore(silent);
+    await snapshots.put(stored(ended, "RESOLVED"));
+    expect((await snapshot(makeApp(cluster, undefined, snapshots), ended)).body.generatedAt).toBe(
+      new Date(T0.getTime() + 90_000).toISOString(),
+    );
+
+    const active = await given({ state: "INCIDENT_ACTIVE", faultInjectedAt: faultAt });
+    const failing = { ...snapshots, get: () => Promise.reject(new Error("redis down")) };
+    const res = await snapshot(makeApp(cluster, undefined, failing), active);
+    expect(res.status).toBe(200);
+    expect(res.body.services).toHaveLength(3);
+  });
+});
 
 describe("GET /api/sessions/:id/dashboard recentEvents", () => {
   const faultAt = new Date(T0.getTime() + 20_000).toISOString();

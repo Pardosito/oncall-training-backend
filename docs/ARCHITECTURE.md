@@ -94,7 +94,7 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 ### 4.2 Full flow
 
 1. **Start**: `POST /api/sessions { scenarioId }`
-   1. The API acquires the global lock: Redis `SET lock:active-session <sessionId> NX PX <ttl>`. TTL = `warmupSeconds + maxResolveSeconds + 180` s. If the lock is taken, the API returns **409** `SESSION_BUSY` with `retryAfterSeconds` (from the lock's PTTL).
+   1. The API acquires the global lock: Redis `SET lock:active-session <sessionId> NX PX <ttl>`, plus `lock:active-session:owner <userId>` with the same TTL in the same Lua script (D-34). TTL = `warmupSeconds + maxResolveSeconds + 180` s. If the lock is taken, the API returns **409** `SESSION_BUSY` with `retryAfterSeconds` (from the lock's PTTL).
    2. `PutItem` the session (`state=STARTING`) with `attribute_not_exists(session_id)`.
    3. Appends a `SESSION_STARTED` event.
    4. `StartExecution` with `name = sessionId` (idempotent) and the input in §8.1.
@@ -233,15 +233,16 @@ The worker needs `userId` to read an item, which is why every queue message carr
 
 ### 7.2 Redis keys
 
-| Key                        | Type                               | TTL                         | Purpose                                                                                       |
-| -------------------------- | ---------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
-| `lock:active-session`      | string (sessionId)                 | warmup + maxResolve + 180 s | Global lock (D-05)                                                                            |
-| `session:{id}:events`      | list (JSON events)                 | 2 h                         | Event buffer until flush                                                                      |
-| `session:{id}:health`      | string (consecutive healthy count) | 1 h                         | Resolution detection: `INCR` on healthy, `SET 0` on unhealthy; in worker memory without Redis |
-| `dashboard:{id}`           | string (JSON snapshot)             | 10 s, refreshed every 2 s   | Polling target                                                                                |
-| `action:{actionId}`        | string                             | 24 h                        | Idempotency (SET NX before applying)                                                          |
-| `stats:{userId}:{query}`   | string (JSON rows)                 | 5 min                       | Athena cache                                                                                  |
-| `leaderboard:{scenarioId}` | string (JSON)                      | 60 s                        | Leaderboard cache                                                                             |
+| Key                         | Type                               | TTL                         | Purpose                                                                                       |
+| --------------------------- | ---------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `lock:active-session`       | string (sessionId)                 | warmup + maxResolve + 180 s | Global lock (D-05)                                                                            |
+| `lock:active-session:owner` | string (userId)                    | same as the lock            | Lets the monitor read the item without a scan (D-34)                                          |
+| `session:{id}:events`       | list (JSON events)                 | 2 h                         | Event buffer until flush                                                                      |
+| `session:{id}:health`       | string (consecutive healthy count) | 1 h                         | Resolution detection: `INCR` on healthy, `SET 0` on unhealthy; in worker memory without Redis |
+| `dashboard:{id}`            | string (JSON snapshot)             | 10 s, refreshed every 2 s   | Polling target                                                                                |
+| `action:{actionId}`         | string                             | 24 h                        | Idempotency (SET NX before applying)                                                          |
+| `stats:{userId}:{query}`    | string (JSON rows)                 | 5 min                       | Athena cache                                                                                  |
+| `leaderboard:{scenarioId}`  | string (JSON)                      | 60 s                        | Leaderboard cache                                                                             |
 
 Redis is a cache plus a lock. **Nothing durable lives only in Redis**, except the event buffer during a session (see DECISIONS, limitations).
 

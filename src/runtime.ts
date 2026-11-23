@@ -14,8 +14,10 @@ import {
   createDashboardService,
   createInMemoryHealthStreakStore,
   createRedisHealthStreakStore,
+  createRedisSnapshotStore,
   dashboardRouter,
   type HealthStreakStore,
+  type SnapshotStore,
 } from "./modules/dashboard/index.js";
 import {
   createEventFlusher,
@@ -77,6 +79,8 @@ export type Services = {
   events?: EventLog;
   /** The resolution streak in Redis (BE-099); in worker memory without it (D-26). */
   streaks?: HealthStreakStore;
+  /** Dashboard snapshots in Redis (BE-097); built on each request without it (BE-130). */
+  snapshots?: SnapshotStore;
   /** For the event flush (`FILES_BUCKET`); absent in `dev:local --in-memory`. */
   s3?: Pick<S3Client, "send">;
 };
@@ -93,6 +97,7 @@ export function createRedisServices(
   lock?: Lock;
   events?: EventLog;
   streaks?: HealthStreakStore;
+  snapshots?: SnapshotStore;
   readinessChecks: ReadinessCheck[];
 } {
   if (!config.REDIS_URL) return { readinessChecks: [] };
@@ -102,6 +107,7 @@ export function createRedisServices(
     lock: createRedisLock({ redis }),
     events: createRedisEventLog({ redis, logger }),
     streaks: createRedisHealthStreakStore({ redis }),
+    snapshots: createRedisSnapshotStore({ redis, logger }),
     readinessChecks: [createRedisReadinessCheck(redis)],
   };
 }
@@ -213,6 +219,7 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
           clock,
           logger,
           ...(services.events ? { events: services.events } : {}),
+          ...(services.snapshots ? { snapshots: services.snapshots } : {}),
         }),
       }),
     ],
@@ -258,14 +265,19 @@ export function startWorkerLoops(services: Services, signal: AbortSignal): Promi
       queue,
       queueUrl: config.USER_ACTIONS_QUEUE_URL,
       parse: (body) => QueueMessageSchema.parse(body),
-      handle: createMessageHandler({ ...shared, ...(events ? { events } : {}) }),
+      handle: createMessageHandler({
+        ...shared,
+        ...(events ? { events } : {}),
+        ...(services.snapshots ? { snapshots: services.snapshots } : {}),
+      }),
       logger,
       signal,
     }),
     runMonitor({
       monitor: createMonitor({
         ...shared,
-        ...(events ? { events: events.recorder } : {}),
+        ...(events ? { events: events.recorder, eventLog: events.log } : {}),
+        ...(services.snapshots ? { snapshots: services.snapshots } : {}),
         enforceTimeouts: config.ORCHESTRATION_MODE === "direct",
       }),
       logger,

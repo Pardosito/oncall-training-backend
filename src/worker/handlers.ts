@@ -8,7 +8,7 @@ import {
   type SystemMessage,
   type UserMessage,
 } from "../modules/actions/index.js";
-import type { HealthStreakStore } from "../modules/dashboard/index.js";
+import type { HealthStreakStore, SnapshotStore } from "../modules/dashboard/index.js";
 import {
   type EventFlusher,
   eventIds,
@@ -31,6 +31,8 @@ export type HandlerDeps = {
   logger: Logger;
   /** The global lock, when Redis is configured; released on `SESSION_ENDED`. */
   lock?: Lock;
+  /** `dashboard:{id}`, deleted on `SESSION_ENDED` (it would expire within 10 s anyway). */
+  snapshots?: SnapshotStore;
   /** The session event log (D-20), when Redis is configured: recorded, flushed, then deleted. */
   events?: { recorder: EventRecorder; log: EventLog; flusher: EventFlusher };
 };
@@ -162,6 +164,7 @@ export function createMessageHandler(deps: HandlerDeps): (message: QueueMessage)
     log: Logger,
   ): Promise<void> {
     await deps.streaks.clear(message.sessionId);
+    await deps.snapshots?.clear(message.sessionId);
     const loaded = await load(message);
     if (!loaded) return;
     await flushEvents(message, loaded.session, log);
