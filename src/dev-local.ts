@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createFakeInjector } from "./dev/fake-injector.js";
+import { createEventRecorder } from "./modules/events/index.js";
 import { createFakeMockCluster } from "./modules/mock-cluster/index.js";
 import { FaultMessageSchema } from "./modules/orchestration/index.js";
 import {
@@ -59,7 +60,7 @@ function scenariosFromDisk(): ScenariosRepo {
   return createStaticScenariosRepo(parseScenarioFiles(files, logger));
 }
 
-let backed: Pick<Services, "sessions" | "scenarios" | "queue" | "lock">;
+let backed: Pick<Services, "sessions" | "scenarios" | "queue" | "lock" | "events" | "s3">;
 let readinessChecks: ReadinessCheck[] = [];
 if (inMemory) {
   backed = {
@@ -73,6 +74,7 @@ if (inMemory) {
   // REDIS_URL (docker-compose's Redis) turns on the global lock, as on EKS.
   const redisServices = createRedisServices(config, logger);
   if (redisServices.lock) backed = { ...backed, lock: redisServices.lock };
+  if (redisServices.events) backed = { ...backed, events: redisServices.events };
   readinessChecks = [...createAwsReadinessChecks(aws, config), ...redisServices.readinessChecks];
 }
 
@@ -90,7 +92,13 @@ const loops = [
     queue: backed.queue,
     queueUrl: config.FAULTS_QUEUE_URL ?? "",
     parse: (body) => FaultMessageSchema.parse(body),
-    handle: createFakeInjector({ sessions: backed.sessions, cluster, clock, logger }),
+    handle: createFakeInjector({
+      sessions: backed.sessions,
+      cluster,
+      clock,
+      logger,
+      ...(backed.events ? { events: createEventRecorder({ events: backed.events, logger }) } : {}),
+    }),
     name: "fake-injector",
     logger,
     signal: root.signal,

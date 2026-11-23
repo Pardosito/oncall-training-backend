@@ -4,6 +4,7 @@ import { createLogger } from "../platform/logger.js";
 import { ordersDownScenario } from "../test-support/scenarios.js";
 import { makeSession, T0 } from "../test-support/sessions.js";
 import { createInMemoryHealthStreakStore } from "../modules/dashboard/index.js";
+import { createEventRecorder, createInMemoryEventLog } from "../modules/events/index.js";
 import { createFakeMockCluster, type MockClusterGateway } from "../modules/mock-cluster/index.js";
 import { createFakeOrchestration } from "../modules/orchestration/index.js";
 import { createStaticScenariosRepo } from "../modules/scenarios/index.js";
@@ -19,9 +20,14 @@ let cluster: ReturnType<typeof createFakeMockCluster>;
 let fake: ReturnType<typeof createFakeOrchestration>;
 let clock: ReturnType<typeof createFixedClock>;
 
-function monitor(gateway: MockClusterGateway = cluster, enforceTimeouts?: boolean) {
+function monitor(
+  gateway: MockClusterGateway = cluster,
+  enforceTimeouts?: boolean,
+  events?: ReturnType<typeof createInMemoryEventLog>,
+) {
   return createMonitor({
     enforceTimeouts,
+    ...(events ? { events: createEventRecorder({ events, logger }) } : {}),
     sessions,
     scenarios: createStaticScenariosRepo([scenario]),
     cluster: gateway,
@@ -147,6 +153,28 @@ describe("monitor tick", () => {
           },
         },
       },
+    ]);
+  });
+
+  it("records RESOLVED and SCORED in the event log when it resolves", async () => {
+    const session = makeSession({
+      state: "INCIDENT_ACTIVE",
+      faultInjectedAt: at(20),
+      acknowledgedAt: at(30),
+      validFixAppliedAt: at(60),
+      wrongActions: 1,
+    });
+    await sessions.create(session);
+    const events = createInMemoryEventLog(logger);
+    const m = monitor(cluster, undefined, events);
+    clock.advance(62);
+    await m.tick();
+    clock.advance(2);
+    expect(await m.tick()).toBe("resolved");
+
+    expect(await events.all(session.sessionId)).toMatchObject([
+      { type: "RESOLVED", ts: at(64), ttd_seconds: 10, ttr_seconds: 44, score: null },
+      { type: "SCORED", ts: at(64), ttd_seconds: 10, ttr_seconds: 44, score: 921 },
     ]);
   });
 

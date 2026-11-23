@@ -15,7 +15,7 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 const { config, logger } = bootstrap("api");
 const aws = createAwsClients(config);
 const backed = createAwsBackedServices(config, logger, aws);
-const { redis, lock, readinessChecks: redisChecks } = createRedisServices(config, logger);
+const { redis, lock, events, readinessChecks: redisChecks } = createRedisServices(config, logger);
 const services = {
   config,
   logger,
@@ -23,6 +23,7 @@ const services = {
   ...backed,
   cluster: await createMockCluster(config, backed.scenarios),
   ...(lock ? { lock } : {}),
+  ...(events ? { events } : {}),
 };
 
 const app = buildApiApp(services, [...createAwsReadinessChecks(aws, config), ...redisChecks]);

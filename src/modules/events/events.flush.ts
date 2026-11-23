@@ -18,9 +18,11 @@ export function eventsObjectKey(session: { sessionId: string; createdAt: string 
 
 export type EventFlusher = {
   /**
-   * Uploads the buffer as NDJSON, then deletes it (BE-073). Idempotent: the key is fixed per
-   * session, so a re-flush overwrites the same object. Empty buffer: nothing is written. The
-   * buffer is deleted only after a successful upload; an upload error is thrown.
+   * Uploads the buffer as NDJSON (BE-073). Idempotent: the key is fixed per session, so a
+   * re-flush overwrites the same object. Empty buffer: nothing is written, so a redelivered
+   * `SESSION_ENDED` after the cleanup can't replace the log with an empty one. An upload error is
+   * thrown. The buffer is NOT deleted here: the worker deletes it once the whole cleanup is done
+   * (§4.2 step 7), so a retry after a failed reset uploads the same full log again.
    */
   flush(session: {
     sessionId: string;
@@ -47,7 +49,6 @@ export function createEventFlusher(deps: {
           ContentType: "application/x-ndjson",
         }),
       );
-      await deps.events.clear(session.sessionId);
       deps.logger.info(
         { sessionId: session.sessionId, key, count: events.length },
         "events flushed",

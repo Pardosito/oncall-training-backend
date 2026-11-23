@@ -7,6 +7,7 @@ import { bodyOf } from "../../test-support/http.js";
 import { ordersDownScenario } from "../../test-support/scenarios.js";
 import { makeSession, T0 } from "../../test-support/sessions.js";
 import { createAuthMiddleware } from "../auth/index.js";
+import { buildEvent, createInMemoryEventLog, eventIds, type EventLog } from "../events/index.js";
 import { createFakeMockCluster, type MockClusterGateway } from "../mock-cluster/index.js";
 import { createStaticScenariosRepo } from "../scenarios/index.js";
 import { createInMemorySessionsRepo, type Session } from "../sessions/index.js";
@@ -19,7 +20,7 @@ const scenario = ordersDownScenario();
 let sessions: ReturnType<typeof createInMemorySessionsRepo>;
 let cluster: ReturnType<typeof createFakeMockCluster>;
 
-function makeApp(gateway: MockClusterGateway = cluster) {
+function makeApp(gateway: MockClusterGateway = cluster, events?: EventLog) {
   const logger = createLogger({ level: "silent" });
   const clock = createFixedClock(T0);
   clock.advance(90);
@@ -29,6 +30,7 @@ function makeApp(gateway: MockClusterGateway = cluster) {
     cluster: gateway,
     clock,
     logger,
+    ...(events ? { events } : {}),
   });
   return createApp({
     logger,
@@ -55,6 +57,57 @@ async function snapshot(app: ReturnType<typeof makeApp>, session: Session, user 
     .set("x-dev-user", user);
   return { status: res.status, body: bodyOf<DashboardSnapshot>(res), headers: res.headers };
 }
+
+describe("GET /api/sessions/:id/dashboard recentEvents", () => {
+  const faultAt = new Date(T0.getTime() + 20_000).toISOString();
+
+  it("come from the event log, newest first, with summaries", async () => {
+    const session = await given({ state: "INCIDENT_ACTIVE", faultInjectedAt: faultAt });
+    const events = createInMemoryEventLog(createLogger({ level: "silent" }));
+    const ids = eventIds(session);
+    await events.append(session.sessionId, buildEvent({ ts: T0, ...ids, type: "SESSION_STARTED" }));
+    await events.append(
+      session.sessionId,
+      buildEvent({ ts: faultAt, ...ids, type: "FAULT_INJECTED", target: "orders" }),
+    );
+    await events.append(
+      session.sessionId,
+      buildEvent({
+        ts: new Date(T0.getTime() + 40_000),
+        ...ids,
+        type: "ACTION",
+        action: "SCALE_DEPLOYMENT",
+        target: "orders",
+        params: { replicas: 2 },
+        valid: true,
+      }),
+    );
+
+    const { body } = await snapshot(makeApp(cluster, events), session);
+
+    expect(body.recentEvents.map((e) => e.summary)).toEqual([
+      "Scaled orders to 2",
+      "Incident started",
+      "Session started",
+    ]);
+  });
+
+  it("fall back to the session item when the buffer is empty or Redis fails", async () => {
+    const session = await given({ state: "INCIDENT_ACTIVE", faultInjectedAt: faultAt });
+    const events = createInMemoryEventLog(createLogger({ level: "silent" }));
+
+    const empty = await snapshot(makeApp(cluster, events), session);
+    expect(empty.body.recentEvents.map((e) => e.type)).toEqual([
+      "FAULT_INJECTED",
+      "SESSION_STARTED",
+    ]);
+
+    const failing = { ...events, recent: () => Promise.reject(new Error("redis down")) };
+    const down = await snapshot(makeApp(cluster, failing), session);
+    expect(down.status).toBe(200);
+    expect(down.body.recentEvents).toEqual(empty.body.recentEvents);
+  });
+});
 
 describe("GET /api/sessions/:id/dashboard", () => {
   it("builds a live snapshot that shows the fault", async () => {

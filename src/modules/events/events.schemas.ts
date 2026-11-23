@@ -52,6 +52,11 @@ export type EventInput = {
   ttrSeconds?: number | undefined;
 };
 
+/** The ids every event carries, picked from a session (never spread a whole session). */
+export function eventIds(session: { userId: string; sessionId: string; scenarioId: string }) {
+  return { userId: session.userId, sessionId: session.sessionId, scenarioId: session.scenarioId };
+}
+
 /** Builds a full event line (BE-070): the same twelve keys every time, in §7.4 order. */
 export function buildEvent(input: EventInput): EventLine {
   return EventLineSchema.parse({

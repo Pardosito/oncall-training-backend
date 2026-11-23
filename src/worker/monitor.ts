@@ -6,6 +6,7 @@ import {
   isResolved,
   observeMockSystem,
 } from "../modules/dashboard/index.js";
+import { eventIds, type EventRecorder } from "../modules/events/index.js";
 import type { MockClusterGateway } from "../modules/mock-cluster/index.js";
 import type { Orchestration } from "../modules/orchestration/index.js";
 import type { ScenariosRepo } from "../modules/scenarios/index.js";
@@ -25,6 +26,8 @@ export type MonitorDeps = {
   streaks: HealthStreakStore;
   clock: Clock;
   logger: Logger;
+  /** The session event log (D-20), when Redis is configured. */
+  events?: EventRecorder;
   /**
    * Direct mode only (D-24): fail sessions stuck in STARTING or past `maxResolveSeconds`. With
    * Step Functions the state machine owns the timeouts (`WaitForFix` → TIMEOUT, infra §6.1).
@@ -107,6 +110,18 @@ export function createMonitor(deps: MonitorDeps): { tick(): Promise<TickResult> 
         },
       });
       await deps.streaks.clear(session.sessionId);
+      if (result === "ok") {
+        const ids = eventIds(session);
+        await deps.events?.record({ ts: now, ...ids, type: "RESOLVED", ttdSeconds, ttrSeconds });
+        await deps.events?.record({
+          ts: now,
+          ...ids,
+          type: "SCORED",
+          score,
+          ttdSeconds,
+          ttrSeconds,
+        });
+      }
       log.info({ score, ttdSeconds, ttrSeconds, result }, "session resolved");
       return "resolved";
     },
