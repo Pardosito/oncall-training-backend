@@ -274,6 +274,7 @@ Redis is a cache plus a lock. **Nothing durable lives only in Redis**, except th
 
 `type` ∈ `SESSION_STARTED | FAULT_INJECTED | ACKNOWLEDGED | ACTION | VIEW_LOGS | RESOLVED | FAILED | SCORED`.
 Every line has the same keys (null when not applicable), so the Glue schema stays flat.
+Lines are built with `buildEvent()` (`events` module), which validates them and fills the nulls. The flush overwrites the same key on a retry, writes nothing for an empty buffer, and deletes the Redis list only after the upload succeeds.
 
 ### 7.5 Scenario definition (`scenarios/*.json`)
 
