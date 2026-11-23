@@ -47,7 +47,7 @@ describe.skipIf(!redisUp)("Redis event log (docker-compose Redis)", () => {
     const aws = localClients();
     afterAll(() => destroyAwsClients(aws));
 
-    it("uploads NDJSON under the partitioned key, overwrites on re-flush, then clears Redis", async () => {
+    it("uploads NDJSON under the partitioned key and overwrites it on a re-flush", async () => {
       const sessionId = ulid();
       const events = createRedisEventLog({ redis, logger, keyFor });
       const flusher = createEventFlusher({ events, s3: aws.s3, bucket: BUCKET, logger });
@@ -60,12 +60,13 @@ describe.skipIf(!redisUp)("Redis event log (docker-compose Redis)", () => {
         key: `logs/year=2026/month=11/day=19/${sessionId}.ndjson`,
         count: 2,
       });
-      expect(await redis.exists(keyFor(sessionId))).toBe(0);
-      expect(await flusher.flush(session)).toBeNull();
+      expect(await redis.llen(keyFor(sessionId))).toBe(2);
 
-      // A redelivered SESSION_ENDED after new events: same key, overwritten.
+      // A retry after one more event: same key, overwritten with the whole buffer.
       await events.append(sessionId, eventFor(sessionId, 2));
-      await flusher.flush(session);
+      expect(await flusher.flush(session)).toMatchObject({ count: 3 });
+      await events.clear(sessionId);
+      expect(await flusher.flush(session)).toBeNull();
       const object = await aws.s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: first?.key }));
       expect(object.ContentType).toBe("application/x-ndjson");
       const body = (await object.Body?.transformToString()) ?? "";
@@ -74,7 +75,7 @@ describe.skipIf(!redisUp)("Redis event log (docker-compose Redis)", () => {
           .trimEnd()
           .split("\n")
           .map((l) => JSON.parse(l) as unknown),
-      ).toEqual([eventFor(sessionId, 2)]);
+      ).toEqual([0, 1, 2].map((i) => eventFor(sessionId, i)));
     });
   });
 });

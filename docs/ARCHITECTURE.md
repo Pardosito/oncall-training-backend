@@ -274,7 +274,21 @@ Redis is a cache plus a lock. **Nothing durable lives only in Redis**, except th
 
 `type` ∈ `SESSION_STARTED | FAULT_INJECTED | ACKNOWLEDGED | ACTION | VIEW_LOGS | RESOLVED | FAILED | SCORED`.
 Every line has the same keys (null when not applicable), so the Glue schema stays flat.
-Lines are built with `buildEvent()` (`events` module), which validates them and fills the nulls. The flush overwrites the same key on a retry, writes nothing for an empty buffer, and deletes the Redis list only after the upload succeeds.
+Lines are built with `buildEvent()` (`events` module), which validates them and fills the nulls. The flush overwrites the same key on a retry, writes nothing for an empty buffer, and never deletes the Redis list: the worker deletes it at the end of the `SESSION_ENDED` cleanup, after the upload, so a retry uploads the full log again.
+
+Who records each type (only when `REDIS_URL` is set; best effort, so a Redis error is logged and never fails the step that caused it):
+
+| Type                 | Recorded by                                             | When                                                                          |
+| -------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `SESSION_STARTED`    | api                                                     | after the orchestration started                                               |
+| `FAULT_INJECTED`     | injector (infra repo; the fake injector in `dev:local`) | after the fault is applied                                                    |
+| `VIEW_LOGS`          | api                                                     | after the logs were read                                                      |
+| `ACKNOWLEDGED`       | worker                                                  | first ACKNOWLEDGE during the incident, at `requestedAt`                       |
+| `ACTION`             | worker                                                  | after a RESTART/SCALE is applied, with `valid`                                |
+| `RESOLVED`, `SCORED` | worker monitor                                          | when its `completeTask` succeeds                                              |
+| `FAILED`             | worker                                                  | on `SESSION_ENDED` with `outcome: FAILED`, unless it is already the last line |
+
+On `SESSION_ENDED` the worker flushes first (an empty buffer means the session was already flushed: nothing is written), then resets the mock system, then deletes the buffer. The dashboard's `recentEvents` come from the buffer, falling back to the session item's timestamps when it is empty or Redis fails.
 
 ### 7.5 Scenario definition (`scenarios/*.json`)
 

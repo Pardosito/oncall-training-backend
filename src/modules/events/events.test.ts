@@ -152,7 +152,7 @@ describe("createEventFlusher", () => {
     return { events, flusher, send };
   };
 
-  it("writes one event per line as NDJSON, then clears the buffer", async () => {
+  it("writes one event per line as NDJSON and leaves the buffer for the caller to clear", async () => {
     const { events, flusher, send } = setup();
     await events.append("s-1", eventFor("s-1", 0));
     await events.append("s-1", eventFor("s-1", 1));
@@ -173,7 +173,7 @@ describe("createEventFlusher", () => {
       eventFor("s-1", 0),
       eventFor("s-1", 1),
     ]);
-    expect(await events.all("s-1")).toEqual([]);
+    expect(await events.all("s-1")).toHaveLength(2);
   });
 
   it("writes nothing for an empty buffer", async () => {
@@ -182,7 +182,7 @@ describe("createEventFlusher", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("keeps the buffer when the upload fails, so a retry can flush it", async () => {
+  it("throws when the upload fails and keeps the buffer", async () => {
     const { events, flusher } = setup(vi.fn().mockRejectedValue(new Error("s3 down")));
     await events.append("s-1", eventFor("s-1", 0));
     await expect(flusher.flush(session)).rejects.toThrow("s3 down");

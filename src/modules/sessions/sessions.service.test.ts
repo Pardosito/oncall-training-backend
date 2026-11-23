@@ -5,6 +5,7 @@ import { createInMemoryLock, type Lock } from "../../platform/lock.js";
 import { createLogger } from "../../platform/logger.js";
 import { ordersDownScenario } from "../../test-support/scenarios.js";
 import { makeSession, T0 } from "../../test-support/sessions.js";
+import { createEventRecorder, createInMemoryEventLog } from "../events/index.js";
 import { createFakeOrchestration } from "../orchestration/index.js";
 import { createStaticScenariosRepo } from "../scenarios/index.js";
 import { createInMemorySessionsRepo } from "./sessions.repo.js";
@@ -14,6 +15,7 @@ const user = { userId: "user-a", username: "alice" };
 const logger = createLogger({ level: "silent" });
 
 function setup(options: { failStart?: Error; lock?: boolean } = {}) {
+  const events = createInMemoryEventLog(logger);
   const sessions = createInMemorySessionsRepo();
   const clock = createFixedClock(T0);
   const fake = createFakeOrchestration(options);
@@ -27,9 +29,10 @@ function setup(options: { failStart?: Error; lock?: boolean } = {}) {
     logger,
     namespace: "mock",
     ...(lock ? { lock } : {}),
+    events: createEventRecorder({ events, logger }),
     newId: () => `01JC0000000000000000000${String(++n).padStart(3, "0")}`,
   });
-  return { service, sessions, clock, calls: fake.calls, lock };
+  return { service, sessions, clock, calls: fake.calls, lock, events };
 }
 
 async function rejection(promise: Promise<unknown>): Promise<AppError> {
@@ -102,6 +105,20 @@ describe("startSession", () => {
 
     expect(failing.sessions.all()).toMatchObject([
       { state: "FAILED", failureReason: "ERROR", endedAt: T0.toISOString() },
+    ]);
+    expect(await failing.events.all("01JC0000000000000000000001")).toEqual([]);
+  });
+
+  it("records SESSION_STARTED once the orchestration started", async () => {
+    const session = await ctx.service.startSession(user, "orders-down");
+    expect(await ctx.events.all(session.sessionId)).toMatchObject([
+      {
+        type: "SESSION_STARTED",
+        ts: T0.toISOString(),
+        user_id: "user-a",
+        session_id: session.sessionId,
+        scenario_id: "orders-down",
+      },
     ]);
   });
 });

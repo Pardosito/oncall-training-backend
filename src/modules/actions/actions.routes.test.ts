@@ -8,6 +8,7 @@ import { bodyOf, errorOf } from "../../test-support/http.js";
 import { ordersDownScenario } from "../../test-support/scenarios.js";
 import { makeSession, T0 } from "../../test-support/sessions.js";
 import { createAuthMiddleware } from "../auth/index.js";
+import { createEventRecorder, createInMemoryEventLog } from "../events/index.js";
 import { createFakeMockCluster } from "../mock-cluster/index.js";
 import { createStaticScenariosRepo } from "../scenarios/index.js";
 import { createInMemorySessionsRepo, type Session } from "../sessions/index.js";
@@ -21,9 +22,11 @@ const scenario = ordersDownScenario();
 let queue: ReturnType<typeof createInMemoryQueue>;
 let sessions: ReturnType<typeof createInMemorySessionsRepo>;
 let app: ReturnType<typeof createApp>;
+let events: ReturnType<typeof createInMemoryEventLog>;
 
 beforeEach(() => {
   const logger = createLogger({ level: "silent" });
+  events = createInMemoryEventLog(logger);
   queue = createInMemoryQueue();
   sessions = createInMemorySessionsRepo();
   const service = createActionsService({
@@ -33,6 +36,7 @@ beforeEach(() => {
     userActionsQueueUrl: QUEUE,
     cluster: createFakeMockCluster({ baseline: scenario.baseline }),
     clock: createFixedClock(T0),
+    events: createEventRecorder({ events, logger }),
     newId: () => "01JC00000000000000000ACT01",
   });
   app = createApp({
@@ -160,6 +164,9 @@ describe("GET /api/sessions/:id/logs", () => {
     const body = bodyOf<{ service: string; lines: string[] }>(res);
     expect(body.service).toBe("orders");
     expect(Array.isArray(body.lines)).toBe(true);
+    expect(await events.all(session.sessionId)).toMatchObject([
+      { type: "VIEW_LOGS", target: "orders", ts: T0.toISOString() },
+    ]);
   });
 
   it("returns 422 for a service outside the scenario and 409 before the fault", async () => {
@@ -174,6 +181,7 @@ describe("GET /api/sessions/:id/logs", () => {
       request(app).get(`/api/sessions/${starting.sessionId}/logs?service=orders`),
     );
     expect(early.status).toBe(409);
+    expect(await events.all(active.sessionId)).toEqual([]);
   });
 
   it("requires the service query param", async () => {

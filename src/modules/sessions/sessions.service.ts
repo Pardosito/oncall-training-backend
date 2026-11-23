@@ -4,6 +4,7 @@ import { conflict, notFound } from "../../platform/errors.js";
 import type { Lock } from "../../platform/lock.js";
 import type { Logger } from "../../platform/logger.js";
 import type { AuthUser } from "../auth/index.js";
+import { eventIds, type EventRecorder } from "../events/index.js";
 import type { Orchestration } from "../orchestration/index.js";
 import type { Scenario, ScenariosRepo } from "../scenarios/index.js";
 import type { SessionsRepo } from "./sessions.repo.js";
@@ -23,6 +24,8 @@ export function createSessionsService(deps: {
    * scans DynamoDB for an active session instead (D-30), which two simultaneous starts can race.
    */
   lock?: Lock;
+  /** The session event log (D-20), when Redis is configured. */
+  events?: EventRecorder;
   /** `MOCK_NAMESPACE`, copied into the fault target. */
   namespace: string;
   newId?: () => string;
@@ -109,6 +112,7 @@ export function createSessionsService(deps: {
         throw error;
       }
 
+      await deps.events?.record({ ts: now, ...eventIds(session), type: "SESSION_STARTED" });
       log.info({ scenarioId }, "session started");
       return session;
     },

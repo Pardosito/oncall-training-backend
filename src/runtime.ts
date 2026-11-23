@@ -1,3 +1,4 @@
+import type { S3Client } from "@aws-sdk/client-s3";
 import type { SFNClient } from "@aws-sdk/client-sfn";
 import type { Redis } from "ioredis";
 import type { Express } from "express";
@@ -14,6 +15,12 @@ import {
   createInMemoryHealthStreakStore,
   dashboardRouter,
 } from "./modules/dashboard/index.js";
+import {
+  createEventFlusher,
+  createEventRecorder,
+  createRedisEventLog,
+  type EventLog,
+} from "./modules/events/index.js";
 import {
   createFakeMockCluster,
   createHttpHealthChecker,
@@ -64,21 +71,26 @@ export type Services = {
   sfn?: Pick<SFNClient, "send">;
   /** The global lock (D-05), only when `REDIS_URL` is set; without it the MVP busy check runs. */
   lock?: Lock;
+  /** The session event log (D-20), only when `REDIS_URL` is set. */
+  events?: EventLog;
+  /** For the event flush (`FILES_BUCKET`); absent in `dev:local --in-memory`. */
+  s3?: Pick<S3Client, "send">;
 };
 
 /**
- * Redis when `REDIS_URL` is set (BE-023): the client (closed on shutdown), the global lock and
- * its `/readyz` check. Nothing without it (Nov 5 MVP, D-24).
+ * Redis when `REDIS_URL` is set (BE-023): the client (closed on shutdown), the global lock, the
+ * event log and the `/readyz` check. Nothing without it (Nov 5 MVP, D-24).
  */
 export function createRedisServices(
   config: Pick<Config, "REDIS_URL">,
   logger: Logger,
-): { redis?: Redis; lock?: Lock; readinessChecks: ReadinessCheck[] } {
+): { redis?: Redis; lock?: Lock; events?: EventLog; readinessChecks: ReadinessCheck[] } {
   if (!config.REDIS_URL) return { readinessChecks: [] };
   const redis = createRedis(config.REDIS_URL, logger);
   return {
     redis,
     lock: createRedisLock({ redis }),
+    events: createRedisEventLog({ redis, logger }),
     readinessChecks: [createRedisReadinessCheck(redis)],
   };
 }
@@ -90,6 +102,7 @@ export function createAwsBackedServices(config: Config, logger: Logger, aws: Aws
     scenarios: createS3ScenariosRepo({ s3: aws.s3, bucket: config.FILES_BUCKET, logger }),
     queue: createSqsQueue(aws.sqs),
     sfn: aws.sfn,
+    s3: aws.s3,
   };
 }
 
@@ -143,6 +156,9 @@ export function createOrchestration(services: Services): Orchestration {
 export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[]): Express {
   const { config, logger, clock, sessions, scenarios, queue, cluster } = services;
   const orchestration = createOrchestration(services);
+  const recorder = services.events
+    ? { events: createEventRecorder({ events: services.events, logger }) }
+    : {};
   const auth =
     config.AUTH_MODE === "dev"
       ? createAuthMiddleware({ mode: "dev", logger })
@@ -164,6 +180,7 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
           logger,
           namespace: config.MOCK_NAMESPACE,
           ...(services.lock ? { lock: services.lock } : {}),
+          ...recorder,
         }),
       }),
       actionsRouter({
@@ -174,10 +191,18 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
           userActionsQueueUrl: config.USER_ACTIONS_QUEUE_URL,
           cluster,
           clock,
+          ...recorder,
         }),
       }),
       dashboardRouter({
-        service: createDashboardService({ sessions, scenarios, cluster, clock, logger }),
+        service: createDashboardService({
+          sessions,
+          scenarios,
+          cluster,
+          clock,
+          logger,
+          ...(services.events ? { events: services.events } : {}),
+        }),
       }),
     ],
   });
@@ -199,19 +224,37 @@ export function startWorkerLoops(services: Services, signal: AbortSignal): Promi
     logger,
     ...(services.lock ? { lock: services.lock } : {}),
   };
+  const recorder = services.events
+    ? createEventRecorder({ events: services.events, logger })
+    : undefined;
+  // Without S3 (in-memory dev) there's nowhere to flush, so no event log at all.
+  const events =
+    services.events && recorder && services.s3
+      ? {
+          recorder,
+          log: services.events,
+          flusher: createEventFlusher({
+            events: services.events,
+            s3: services.s3,
+            bucket: config.FILES_BUCKET,
+            logger,
+          }),
+        }
+      : undefined;
 
   return [
     runConsumer({
       queue,
       queueUrl: config.USER_ACTIONS_QUEUE_URL,
       parse: (body) => QueueMessageSchema.parse(body),
-      handle: createMessageHandler(shared),
+      handle: createMessageHandler({ ...shared, ...(events ? { events } : {}) }),
       logger,
       signal,
     }),
     runMonitor({
       monitor: createMonitor({
         ...shared,
+        ...(events ? { events: events.recorder } : {}),
         enforceTimeouts: config.ORCHESTRATION_MODE === "direct",
       }),
       logger,

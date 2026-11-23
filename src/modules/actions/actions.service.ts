@@ -3,6 +3,7 @@ import type { Clock } from "../../platform/clock.js";
 import { conflict, notFound, unprocessable } from "../../platform/errors.js";
 import type { MessageQueue } from "../../platform/queue.js";
 import type { AuthUser } from "../auth/index.js";
+import { eventIds, type EventRecorder } from "../events/index.js";
 import type { MockClusterGateway } from "../mock-cluster/index.js";
 import type { Scenario, ScenariosRepo } from "../scenarios/index.js";
 import { isTerminal, type Session, type SessionsRepo } from "../sessions/index.js";
@@ -25,6 +26,8 @@ export function createActionsService(deps: {
   userActionsQueueUrl: string;
   cluster: MockClusterGateway;
   clock: Clock;
+  /** The session event log (D-20), when Redis is configured. */
+  events?: EventRecorder;
   newId?: () => string;
 }) {
   const newId = deps.newId ?? (() => ulid());
@@ -91,7 +94,14 @@ export function createActionsService(deps: {
       if (session.state !== "INCIDENT_ACTIVE") {
         throw conflict("SESSION_NOT_ACTIVE", `The session is ${session.state}.`);
       }
-      return { service, lines: await deps.cluster.readLogs(service, LOG_TAIL_LINES) };
+      const lines = await deps.cluster.readLogs(service, LOG_TAIL_LINES);
+      await deps.events?.record({
+        ts: deps.clock.now(),
+        ...eventIds(session),
+        type: "VIEW_LOGS",
+        target: service,
+      });
+      return { service, lines };
     },
   };
 }
