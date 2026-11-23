@@ -187,6 +187,7 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 **Why:** the MVP runs without ElastiCache (D-24). Building the client (BE-023) now, only to make it optional under BE-129, is work with no demo value. `/readyz` checks DynamoDB and S3; the Redis check arrives with the client in M2.
 **Consequence:** BE-099 (resolution detector) keeps its consecutive-healthy counter in worker memory behind an interface (single worker replica, D-08); the Redis implementation comes in M2.
+**Update (Nov 22):** the Redis client, lock, event log and streak exist now (#139–#142). Each is used only when `REDIS_URL` is set; without it the MVP behavior stays.
 
 ### D-27 · Image platform, tags and who pushes
 

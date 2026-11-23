@@ -1,3 +1,4 @@
+import type { Redis } from "ioredis";
 import type { Session } from "../sessions/index.js";
 
 /** Healthy checks in a row needed before a session counts as resolved (D-07). */
@@ -16,7 +17,7 @@ export function isResolved(input: {
   );
 }
 
-/** Counts consecutive all-healthy checks per session. Redis-backed in M2 (`session:{id}:health`). */
+/** Counts consecutive all-healthy checks per session (`session:{id}:health` in Redis). */
 export type HealthStreakStore = {
   /** Records one check and returns the current streak (reset to 0 on an unhealthy check). */
   record(sessionId: string, allHealthy: boolean): Promise<number>;
@@ -38,6 +39,42 @@ export function createInMemoryHealthStreakStore(): HealthStreakStore {
     clear: (sessionId) => {
       streaks.delete(sessionId);
       return Promise.resolve();
+    },
+  };
+}
+
+/** ARCHITECTURE §7.2: outlives any incident; a stale streak just expires. */
+export const HEALTH_STREAK_TTL_SECONDS = 60 * 60;
+export const healthStreakKey = (sessionId: string) => `session:${sessionId}:health`;
+
+/**
+ * BE-099: `INCR` on a healthy check, reset to 0 on an unhealthy one, `EX 3600` either way. In
+ * Redis the streak survives a worker restart, so a restart no longer delays resolution.
+ */
+export function createRedisHealthStreakStore(deps: {
+  redis: Pick<Redis, "multi" | "set" | "del">;
+  /** Overridable so integration tests don't touch dev keys. */
+  keyFor?: (sessionId: string) => string;
+}): HealthStreakStore {
+  const keyFor = deps.keyFor ?? healthStreakKey;
+  return {
+    async record(sessionId, allHealthy) {
+      const key = keyFor(sessionId);
+      if (!allHealthy) {
+        await deps.redis.set(key, "0", "EX", HEALTH_STREAK_TTL_SECONDS);
+        return 0;
+      }
+      const results = await deps.redis
+        .multi()
+        .incr(key)
+        .expire(key, HEALTH_STREAK_TTL_SECONDS)
+        .exec();
+      const [incrError, count] = results?.[0] ?? [new Error("streak update aborted"), null];
+      if (incrError) throw incrError;
+      return Number(count);
+    },
+    async clear(sessionId) {
+      await deps.redis.del(keyFor(sessionId));
     },
   };
 }
