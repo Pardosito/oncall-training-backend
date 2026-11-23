@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFixedClock } from "../platform/clock.js";
+import { createInMemoryLock, type Lock } from "../platform/lock.js";
 import { createLogger } from "../platform/logger.js";
 import { ordersDownScenario } from "../test-support/scenarios.js";
 import { makeSession, T0 } from "../test-support/sessions.js";
@@ -175,6 +176,83 @@ describe("SESSION_ENDED", () => {
     });
 
     expect((await deployment("orders"))?.desiredReplicas).toBe(0);
+  });
+});
+
+describe("SESSION_ENDED with the global lock", () => {
+  let lock: Lock;
+  const ended = (target: Session): QueueMessage => ({
+    kind: "SYSTEM",
+    type: "SESSION_ENDED",
+    sessionId: target.sessionId,
+    userId: target.userId,
+    outcome: "FAILED",
+    reason: "TIMEOUT",
+  });
+  beforeEach(() => {
+    lock = createInMemoryLock(clock);
+    handle = createMessageHandler({
+      sessions,
+      scenarios: createStaticScenariosRepo([scenario]),
+      cluster,
+      orchestration: fake.orchestration,
+      streaks,
+      clock,
+      logger: createLogger({ level: "silent" }),
+      lock,
+    });
+  });
+
+  it("releases the session's lock after the reset", async () => {
+    await lock.acquire(session.sessionId, 60_000);
+    cluster.applyFault({ type: "SCALE_TO_ZERO", target: "orders" });
+
+    await handle(ended(session));
+
+    expect((await deployment("orders"))?.desiredReplicas).toBe(2);
+    expect(await lock.holder()).toBeNull();
+  });
+
+  it("neither resets nor frees the lock of the session that started since (late SESSION_ENDED)", async () => {
+    const old = makeSession({ sessionId: "01JC0000000000000000000OLD", state: "FAILED" });
+    await sessions.create(old);
+    await lock.acquire(session.sessionId, 60_000);
+    cluster.applyFault({ type: "SCALE_TO_ZERO", target: "orders" }); // the running session's fault
+    const scan = vi.spyOn(sessions, "findActive");
+
+    await handle(ended(old));
+
+    expect(await lock.holder()).toBe(session.sessionId);
+    expect((await deployment("orders"))?.desiredReplicas).toBe(0);
+    expect(scan).not.toHaveBeenCalled(); // the lock holder answers it, no DynamoDB scan
+  });
+
+  it("frees the lock at once for an abandon during the warmup (D-32)", async () => {
+    const starting = makeSession({ sessionId: "01JC0000000000000000000STA", state: "STARTING" });
+    await sessions.create(starting);
+    await lock.acquire(starting.sessionId, 60_000);
+
+    await handle(user({ type: "ABANDON" }, starting));
+
+    expect(await lock.holder()).toBeNull();
+  });
+
+  it("keeps the lock for an abandon during the incident until SESSION_ENDED resets", async () => {
+    await lock.acquire(session.sessionId, 60_000);
+
+    await handle(user({ type: "ABANDON" }));
+
+    expect(await lock.holder()).toBe(session.sessionId);
+  });
+
+  it("keeps the lock when the reset fails, so the retry resets before anyone starts", async () => {
+    await lock.acquire(session.sessionId, 60_000);
+    vi.spyOn(cluster, "scale").mockRejectedValue(new Error("k8s down"));
+    cluster.applyFault({ type: "SCALE_TO_ZERO", target: "orders" });
+
+    await expect(handle(ended(session))).rejects.toThrow("reset failed");
+
+    expect(await lock.holder()).toBe(session.sessionId);
   });
 });
 

@@ -26,5 +26,11 @@ export type { SessionKey, SessionsRepo, Transition, TransitionFields } from "./s
 export { createSessionsService } from "./sessions.service.js";
 export type { SessionsService } from "./sessions.service.js";
 export { sessionsRouter } from "./sessions.routes.js";
-export { latestEndOf, STARTING_GRACE_SECONDS, timeoutOf } from "./sessions.timeouts.js";
+export {
+  LOCK_SLACK_SECONDS,
+  latestEndOf,
+  lockTtlMs,
+  STARTING_GRACE_SECONDS,
+  timeoutOf,
+} from "./sessions.timeouts.js";
 export type { SessionTimeout } from "./sessions.timeouts.js";

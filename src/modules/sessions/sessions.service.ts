@@ -1,13 +1,14 @@
 import { ulid } from "ulid";
 import type { Clock } from "../../platform/clock.js";
 import { conflict, notFound } from "../../platform/errors.js";
+import type { Lock } from "../../platform/lock.js";
 import type { Logger } from "../../platform/logger.js";
 import type { AuthUser } from "../auth/index.js";
 import type { Orchestration } from "../orchestration/index.js";
-import type { ScenariosRepo } from "../scenarios/index.js";
+import type { Scenario, ScenariosRepo } from "../scenarios/index.js";
 import type { SessionsRepo } from "./sessions.repo.js";
 import type { Session } from "./sessions.schemas.js";
-import { latestEndOf } from "./sessions.timeouts.js";
+import { latestEndOf, lockTtlMs } from "./sessions.timeouts.js";
 
 export type SessionsService = ReturnType<typeof createSessionsService>;
 
@@ -17,24 +18,36 @@ export function createSessionsService(deps: {
   orchestration: Orchestration;
   clock: Clock;
   logger: Logger;
+  /**
+   * The global lock (D-05) when Redis is configured. Without it (Nov 5 MVP), the busy check
+   * scans DynamoDB for an active session instead (D-30), which two simultaneous starts can race.
+   */
+  lock?: Lock;
   /** `MOCK_NAMESPACE`, copied into the fault target. */
   namespace: string;
   newId?: () => string;
 }) {
   const newId = deps.newId ?? (() => ulid());
 
-  /** 409 `SESSION_BUSY` while any session is active (D-05; the MVP checks DynamoDB, D-30). */
+  const busy = (retryAfterSeconds: number) =>
+    conflict("SESSION_BUSY", "A scenario is already running.", {
+      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterSeconds)),
+    });
+
+  /** MVP busy check without Redis: 409 while any session is active (D-30). */
   async function assertNoActiveSession(): Promise<void> {
     const active = await deps.sessions.findActive();
     if (!active) return;
     const scenario = await deps.scenarios.get(active.scenarioId);
-    const retryAfterSeconds = scenario
-      ? Math.max(
-          1,
-          Math.ceil((latestEndOf(active, scenario).getTime() - deps.clock.now().getTime()) / 1000),
-        )
-      : 60;
-    throw conflict("SESSION_BUSY", "A scenario is already running.", { retryAfterSeconds });
+    throw busy(
+      scenario ? (latestEndOf(active, scenario).getTime() - deps.clock.now().getTime()) / 1000 : 60,
+    );
+  }
+
+  /** §4.2 step 1: take the lock for this session, or 409 with the lock's remaining TTL. */
+  async function acquireLock(lock: Lock, sessionId: string, scenario: Scenario): Promise<void> {
+    if (await lock.acquire(sessionId, lockTtlMs(scenario))) return;
+    throw busy((await lock.remainingMs()) / 1000);
   }
 
   return {
@@ -42,12 +55,14 @@ export function createSessionsService(deps: {
     async startSession(user: AuthUser, scenarioId: string): Promise<Session> {
       const scenario = await deps.scenarios.get(scenarioId);
       if (!scenario) throw notFound("Scenario not found.");
-      await assertNoActiveSession();
+      const sessionId = newId();
+      if (deps.lock) await acquireLock(deps.lock, sessionId, scenario);
+      else await assertNoActiveSession();
 
       const now = deps.clock.now();
       const session: Session = {
         userId: user.userId,
-        sessionId: newId(),
+        sessionId,
         username: user.username,
         scenarioId,
         state: "STARTING",
@@ -56,8 +71,19 @@ export function createSessionsService(deps: {
         wrongActions: 0,
         actionsCount: 0,
       };
-      await deps.sessions.create(session);
-      const log = deps.logger.child({ sessionId: session.sessionId, userId: user.userId });
+      const log = deps.logger.child({ sessionId, userId: user.userId });
+      // §4.2 step 5: a start that fails frees the lock again, so the user can retry right away.
+      const releaseLock = () =>
+        deps.lock
+          ?.release(sessionId)
+          .catch((error: unknown) => log.error({ err: error }, "could not release the lock"));
+
+      try {
+        await deps.sessions.create(session);
+      } catch (error) {
+        await releaseLock();
+        throw error;
+      }
 
       try {
         await deps.orchestration.start({
@@ -79,6 +105,7 @@ export function createSessionsService(deps: {
           .catch((cleanupError: unknown) =>
             log.error({ err: cleanupError }, "could not mark the session FAILED"),
           );
+        await releaseLock();
         throw error;
       }
 

@@ -1,4 +1,5 @@
 import type { SFNClient } from "@aws-sdk/client-sfn";
+import type { Redis } from "ioredis";
 import type { Express } from "express";
 import { createApp } from "./app.js";
 import type { Config } from "./config/index.js";
@@ -39,7 +40,9 @@ import { openApiRouter } from "./openapi/openapi.routes.js";
 import type { AwsClients } from "./platform/aws.js";
 import { type Clock, systemClock } from "./platform/clock.js";
 import type { ReadinessCheck } from "./platform/http/health.js";
+import { createRedisLock, type Lock } from "./platform/lock.js";
 import type { Logger } from "./platform/logger.js";
+import { createRedis, createRedisReadinessCheck } from "./platform/redis.js";
 import { createSqsQueue, type MessageQueue } from "./platform/queue.js";
 import { createMessageHandler } from "./worker/handlers.js";
 import { createMonitor, runMonitor } from "./worker/monitor.js";
@@ -59,7 +62,26 @@ export type Services = {
   cluster: MockClusterGateway;
   /** Only needed with `ORCHESTRATION_MODE=stepfunctions`. */
   sfn?: Pick<SFNClient, "send">;
+  /** The global lock (D-05), only when `REDIS_URL` is set; without it the MVP busy check runs. */
+  lock?: Lock;
 };
+
+/**
+ * Redis when `REDIS_URL` is set (BE-023): the client (closed on shutdown), the global lock and
+ * its `/readyz` check. Nothing without it (Nov 5 MVP, D-24).
+ */
+export function createRedisServices(
+  config: Pick<Config, "REDIS_URL">,
+  logger: Logger,
+): { redis?: Redis; lock?: Lock; readinessChecks: ReadinessCheck[] } {
+  if (!config.REDIS_URL) return { readinessChecks: [] };
+  const redis = createRedis(config.REDIS_URL, logger);
+  return {
+    redis,
+    lock: createRedisLock({ redis }),
+    readinessChecks: [createRedisReadinessCheck(redis)],
+  };
+}
 
 /** Repos and the queue on real AWS clients (LocalStack locally, through `AWS_ENDPOINT_URL`). */
 export function createAwsBackedServices(config: Config, logger: Logger, aws: AwsClients) {
@@ -141,6 +163,7 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
           clock,
           logger,
           namespace: config.MOCK_NAMESPACE,
+          ...(services.lock ? { lock: services.lock } : {}),
         }),
       }),
       actionsRouter({
@@ -166,7 +189,16 @@ export function startWorkerLoops(services: Services, signal: AbortSignal): Promi
   const orchestration = createOrchestration(services);
   // One worker replica (D-08), so the streak can live in memory until Redis (D-26).
   const streaks = createInMemoryHealthStreakStore();
-  const shared = { sessions, scenarios, cluster, orchestration, streaks, clock, logger };
+  const shared = {
+    sessions,
+    scenarios,
+    cluster,
+    orchestration,
+    streaks,
+    clock,
+    logger,
+    ...(services.lock ? { lock: services.lock } : {}),
+  };
 
   return [
     runConsumer({

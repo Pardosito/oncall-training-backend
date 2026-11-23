@@ -8,6 +8,17 @@ import type { FailureReason, Session } from "./sessions.schemas.js";
  */
 export const STARTING_GRACE_SECONDS = 120;
 
+/** Slack on top of a session's longest run before its lock expires on its own (§4.2 step 1). */
+export const LOCK_SLACK_SECONDS = 180;
+
+/**
+ * TTL of the global lock (BE-065): warmup + max resolve time + 3 min, so it outlives any
+ * session (including cleanup) and frees itself if nobody releases it.
+ */
+export function lockTtlMs(scenario: Pick<Scenario, "warmupSeconds" | "maxResolveSeconds">): number {
+  return (scenario.warmupSeconds + scenario.maxResolveSeconds + LOCK_SLACK_SECONDS) * 1000;
+}
+
 export type SessionTimeout = { at: Date; reason: FailureReason };
 
 const plusSeconds = (iso: string, seconds: number) => new Date(Date.parse(iso) + seconds * 1000);

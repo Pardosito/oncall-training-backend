@@ -17,6 +17,7 @@ import { createInMemoryQueue } from "./platform/queue.js";
 import {
   buildApiApp,
   createAwsBackedServices,
+  createRedisServices,
   type Services,
   startWorkerLoops,
 } from "./runtime.js";
@@ -58,7 +59,7 @@ function scenariosFromDisk(): ScenariosRepo {
   return createStaticScenariosRepo(parseScenarioFiles(files, logger));
 }
 
-let backed: Pick<Services, "sessions" | "scenarios" | "queue">;
+let backed: Pick<Services, "sessions" | "scenarios" | "queue" | "lock">;
 let readinessChecks: ReadinessCheck[] = [];
 if (inMemory) {
   backed = {
@@ -69,7 +70,10 @@ if (inMemory) {
 } else {
   const aws = createAwsClients(config);
   backed = createAwsBackedServices(config, logger, aws);
-  readinessChecks = createAwsReadinessChecks(aws, config);
+  // REDIS_URL (docker-compose's Redis) turns on the global lock, as on EKS.
+  const redisServices = createRedisServices(config, logger);
+  if (redisServices.lock) backed = { ...backed, lock: redisServices.lock };
+  readinessChecks = [...createAwsReadinessChecks(aws, config), ...redisServices.readinessChecks];
 }
 
 const baseline = Object.assign(

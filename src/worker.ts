@@ -6,7 +6,13 @@ import {
   createHealthServer,
   onShutdownSignal,
 } from "./platform/process.js";
-import { createAwsBackedServices, createMockCluster, startWorkerLoops } from "./runtime.js";
+import { closeRedis } from "./platform/redis.js";
+import {
+  createAwsBackedServices,
+  createMockCluster,
+  createRedisServices,
+  startWorkerLoops,
+} from "./runtime.js";
 
 /** In-flight messages get this long to finish after SIGTERM (CONVENTIONS §10). */
 const DRAIN_TIMEOUT_MS = 25_000;
@@ -14,12 +20,14 @@ const DRAIN_TIMEOUT_MS = 25_000;
 const { config, logger } = bootstrap("worker");
 const aws = createAwsClients(config);
 const backed = createAwsBackedServices(config, logger, aws);
+const { redis, lock } = createRedisServices(config, logger);
 const services = {
   config,
   logger,
   clock: systemClock,
   ...backed,
   cluster: await createMockCluster(config, backed.scenarios),
+  ...(lock ? { lock } : {}),
 };
 
 /** Aborted on SIGTERM; every loop (consumer, monitor) stops on it (CONVENTIONS §10). */
@@ -46,4 +54,5 @@ onShutdownSignal(logger, async () => {
   await Promise.race([drained, timeout]);
   await closeServer(healthServer, 1_000);
   destroyAwsClients(aws);
+  if (redis) await closeRedis(redis);
 });

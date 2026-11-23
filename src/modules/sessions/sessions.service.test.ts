@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createFixedClock } from "../../platform/clock.js";
 import { AppError } from "../../platform/errors.js";
+import { createInMemoryLock, type Lock } from "../../platform/lock.js";
 import { createLogger } from "../../platform/logger.js";
 import { ordersDownScenario } from "../../test-support/scenarios.js";
 import { makeSession, T0 } from "../../test-support/sessions.js";
@@ -12,10 +13,11 @@ import { createSessionsService } from "./sessions.service.js";
 const user = { userId: "user-a", username: "alice" };
 const logger = createLogger({ level: "silent" });
 
-function setup(options: { failStart?: Error } = {}) {
+function setup(options: { failStart?: Error; lock?: boolean } = {}) {
   const sessions = createInMemorySessionsRepo();
   const clock = createFixedClock(T0);
   const fake = createFakeOrchestration(options);
+  const lock: Lock | undefined = options.lock ? createInMemoryLock(clock) : undefined;
   let n = 0;
   const service = createSessionsService({
     sessions,
@@ -24,9 +26,10 @@ function setup(options: { failStart?: Error } = {}) {
     clock,
     logger,
     namespace: "mock",
+    ...(lock ? { lock } : {}),
     newId: () => `01JC0000000000000000000${String(++n).padStart(3, "0")}`,
   });
-  return { service, sessions, clock, calls: fake.calls };
+  return { service, sessions, clock, calls: fake.calls, lock };
 }
 
 async function rejection(promise: Promise<unknown>): Promise<AppError> {
@@ -113,5 +116,39 @@ describe("getSession", () => {
       ctx.service.getSession({ userId: "user-b", username: "bob" }, session.sessionId),
     );
     expect(error.httpStatus).toBe(404);
+  });
+});
+
+describe("startSession with the global lock", () => {
+  it("holds the lock for the new session with the scenario's TTL", async () => {
+    const ctx = setup({ lock: true });
+    const session = await ctx.service.startSession(user, "orders-down");
+
+    expect(await ctx.lock?.holder()).toBe(session.sessionId);
+    const scenario = ordersDownScenario();
+    expect(await ctx.lock?.remainingMs()).toBe(
+      (scenario.warmupSeconds + scenario.maxResolveSeconds + 180) * 1000,
+    );
+  });
+
+  it("returns 409 SESSION_BUSY with the lock's remaining TTL, without writing a session", async () => {
+    const ctx = setup({ lock: true });
+    await ctx.lock?.acquire("someone-else", 90_500);
+    ctx.clock.advance(30);
+
+    const error = await rejection(ctx.service.startSession(user, "orders-down"));
+
+    expect(error).toMatchObject({ code: "SESSION_BUSY", httpStatus: 409 });
+    expect(error.details).toEqual({ retryAfterSeconds: 61 });
+    expect(ctx.sessions.all()).toEqual([]);
+  });
+
+  it("releases the lock when the orchestration can't start", async () => {
+    const ctx = setup({ lock: true, failStart: new Error("sfn down") });
+
+    await expect(ctx.service.startSession(user, "orders-down")).rejects.toThrow("sfn down");
+
+    expect(await ctx.lock?.holder()).toBeNull();
+    expect(ctx.sessions.all()[0]).toMatchObject({ state: "FAILED" });
   });
 });
