@@ -1,17 +1,27 @@
 import type { Clock } from "../platform/clock.js";
+import type { Lock } from "../platform/lock.js";
 import type { Logger } from "../platform/logger.js";
 import {
   allServicesUp,
+  buildSnapshot,
   type HealthStreakStore,
   isResolved,
+  loadRecentEvents,
+  type MockSystemObservation,
   observeMockSystem,
+  type SnapshotStore,
 } from "../modules/dashboard/index.js";
-import { eventIds, type EventRecorder } from "../modules/events/index.js";
+import { eventIds, type EventLog, type EventRecorder } from "../modules/events/index.js";
 import type { MockClusterGateway } from "../modules/mock-cluster/index.js";
 import type { Orchestration } from "../modules/orchestration/index.js";
-import type { ScenariosRepo } from "../modules/scenarios/index.js";
+import type { Scenario, ScenariosRepo } from "../modules/scenarios/index.js";
 import { computeScore } from "../modules/scoring/index.js";
-import { type SessionsRepo, timeoutOf } from "../modules/sessions/index.js";
+import {
+  isTerminal,
+  type Session,
+  type SessionsRepo,
+  timeoutOf,
+} from "../modules/sessions/index.js";
 import { resetToBaseline } from "./reset.js";
 
 export const MONITOR_INTERVAL_MS = 2_000;
@@ -28,6 +38,11 @@ export type MonitorDeps = {
   logger: Logger;
   /** The session event log (D-20), when Redis is configured. */
   events?: EventRecorder;
+  /** With Redis: the lock holder is the active session, so there's no DynamoDB scan (BE-100). */
+  lock?: Lock;
+  /** With Redis: a snapshot per tick for the api to serve (BE-097), with events from `eventLog`. */
+  snapshots?: SnapshotStore;
+  eventLog?: EventLog;
   /**
    * Direct mode only (D-24): fail sessions stuck in STARTING or past `maxResolveSeconds`. With
    * Step Functions the state machine owns the timeouts (`WaitForFix` → TIMEOUT, infra §6.1).
@@ -38,16 +53,52 @@ export type MonitorDeps = {
 export type TickResult = "idle" | "timed-out" | "waiting" | "watching" | "resolved";
 
 /**
- * One monitor pass (BE-100/101, MVP shape): find the active session (no lock without Redis,
- * D-30), enforce its timeout (the state machine's job in M2), and resolve it once a valid fix
- * was applied and every service was up on 2 consecutive checks. No session → no k8s calls.
+ * One monitor pass (BE-100/101): find the active session (the lock holder with Redis, a scan
+ * without it, D-30), enforce its timeout (direct mode only), store a dashboard snapshot (Redis),
+ * and resolve it once a valid fix was applied and every service was up on 2 consecutive checks.
+ * No session → no k8s calls.
  */
 export function createMonitor(deps: MonitorDeps): { tick(): Promise<TickResult> } {
   // Sessions already reset to baseline while STARTING (in memory: a restart just resets again).
   const prepared = new Set<string>();
+
+  /**
+   * ARCHITECTURE §7.2: the lock stores the owner's userId next to the sessionId, so the item is
+   * one GetItem away. A lock without an owner (taken by an older api) falls back to the scan.
+   */
+  async function findActive(): Promise<Session | undefined> {
+    if (!deps.lock) return deps.sessions.findActive();
+    const current = await deps.lock.current();
+    if (!current) return undefined;
+    const session = current.userId
+      ? await deps.sessions.get({ userId: current.userId, sessionId: current.sessionId })
+      : await deps.sessions.findActive();
+    if (!session || session.sessionId !== current.sessionId || isTerminal(session.state)) {
+      return undefined;
+    }
+    return session;
+  }
+
+  /** A failed snapshot write is logged: the api builds the snapshot live meanwhile. */
+  async function storeSnapshot(
+    snapshots: SnapshotStore,
+    session: Session,
+    scenario: Scenario,
+    observation: MockSystemObservation,
+    now: Date,
+    log: Logger,
+  ): Promise<void> {
+    try {
+      const events = await loadRecentEvents(session, deps.eventLog, log);
+      await snapshots.put(buildSnapshot({ session, scenario, ...observation, events, now }));
+    } catch (error) {
+      log.warn({ err: error }, "could not store the dashboard snapshot");
+    }
+  }
+
   return {
     async tick() {
-      const session = await deps.sessions.findActive();
+      const session = await findActive();
       if (!session) return "idle";
       const log = deps.logger.child({ sessionId: session.sessionId });
       const scenario = await deps.scenarios.get(session.scenarioId);
@@ -81,9 +132,16 @@ export function createMonitor(deps: MonitorDeps): { tick(): Promise<TickResult> 
         prepared.add(session.sessionId);
         log.info("mock system reset to baseline before the fault");
       }
+      const watching = session.state === "INCIDENT_ACTIVE" && Boolean(session.faultInjectedAt);
+      if (!watching && !deps.snapshots) return "waiting";
+
+      // One read of the mock system per tick serves both the snapshot and the streak.
+      const observation = await observeMockSystem(deps.cluster, scenario.targets);
+      if (deps.snapshots) {
+        await storeSnapshot(deps.snapshots, session, scenario, observation, now, log);
+      }
       if (session.state !== "INCIDENT_ACTIVE" || !session.faultInjectedAt) return "waiting";
 
-      const observation = await observeMockSystem(deps.cluster, scenario.targets);
       const consecutiveHealthy = await deps.streaks.record(
         session.sessionId,
         allServicesUp(observation, scenario.targets),

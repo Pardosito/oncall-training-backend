@@ -62,7 +62,7 @@ function scenariosFromDisk(): ScenariosRepo {
 
 let backed: Pick<
   Services,
-  "sessions" | "scenarios" | "queue" | "lock" | "events" | "streaks" | "s3"
+  "sessions" | "scenarios" | "queue" | "lock" | "events" | "streaks" | "snapshots" | "s3"
 >;
 let readinessChecks: ReadinessCheck[] = [];
 if (inMemory) {
@@ -79,6 +79,7 @@ if (inMemory) {
   if (redisServices.lock) backed = { ...backed, lock: redisServices.lock };
   if (redisServices.events) backed = { ...backed, events: redisServices.events };
   if (redisServices.streaks) backed = { ...backed, streaks: redisServices.streaks };
+  if (redisServices.snapshots) backed = { ...backed, snapshots: redisServices.snapshots };
   readinessChecks = [...createAwsReadinessChecks(aws, config), ...redisServices.readinessChecks];
 }
 

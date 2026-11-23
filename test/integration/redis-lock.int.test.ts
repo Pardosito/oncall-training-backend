@@ -19,7 +19,7 @@ describe.skipIf(!redisUp)("Redis lock (docker-compose Redis)", () => {
   // A fresh key per test, so the dev lock (lock:active-session) is never touched.
   describeLockContract("redis", () => {
     const key = `it:lock:${ulid()}`;
-    keys.push(key);
+    keys.push(key, `${key}:owner`);
     return { lock: createRedisLock({ redis, key }), advance: sleep };
   });
 });

@@ -9,6 +9,35 @@ import { isTerminal, type Session, type SessionsRepo } from "../sessions/index.j
 import { buildSnapshot, eventsFromSession } from "./dashboard.builder.js";
 import { observeMockSystem } from "./dashboard.observe.js";
 import type { DashboardSnapshot } from "./dashboard.schemas.js";
+import type { SnapshotStore } from "./dashboard.snapshots.js";
+
+type RecentEvent = DashboardSnapshot["recentEvents"][number];
+
+/**
+ * `recentEvents` from the Redis event log, newest first (BE-072); from the session item's
+ * timestamps without Redis, with an empty or already flushed buffer, or on a Redis error.
+ */
+export async function loadRecentEvents(
+  session: Session,
+  events: EventLog | undefined,
+  logger: Logger,
+): Promise<RecentEvent[]> {
+  if (!events) return eventsFromSession(session);
+  try {
+    const lines = await events.recent(session.sessionId);
+    if (lines.length > 0) {
+      return lines
+        .reverse()
+        .map((event) => ({ ts: event.ts, type: event.type, summary: summarizeEvent(event) }));
+    }
+  } catch (error) {
+    logger.warn(
+      { err: error, sessionId: session.sessionId },
+      "could not read the event log; events from the session item",
+    );
+  }
+  return eventsFromSession(session);
+}
 
 export type DashboardService = ReturnType<typeof createDashboardService>;
 
@@ -16,8 +45,8 @@ export type DashboardService = ReturnType<typeof createDashboardService>;
  * Nov 5 MVP (BE-130): the snapshot is built on each request from the session item and a live
  * read of the mock system; there is no Redis cache. Terminal sessions get a minimal final
  * snapshot (no services), and a failed cluster read gives the same with `stale: true`.
- * `recentEvents` come from the Redis event log when there is one (BE-072), otherwise (no Redis,
- * an empty or already flushed buffer, a Redis error) from the session item's timestamps.
+ * With Redis (BE-097), an active session's snapshot is the one the worker's monitor stored, if
+ * it is there and matches the session's state; otherwise it's built live as above.
  */
 export function createDashboardService(deps: {
   sessions: SessionsRepo;
@@ -26,23 +55,21 @@ export function createDashboardService(deps: {
   clock: Clock;
   logger: Logger;
   events?: EventLog;
+  snapshots?: SnapshotStore;
 }) {
-  async function recentEvents(session: Session) {
-    if (!deps.events) return eventsFromSession(session);
+  /** The monitor's snapshot, unless it's missing or from before a state change (≤ 2 s old). */
+  async function cached(session: Session): Promise<DashboardSnapshot | null> {
+    if (!deps.snapshots) return null;
     try {
-      const events = await deps.events.recent(session.sessionId);
-      if (events.length > 0) {
-        return events
-          .reverse()
-          .map((event) => ({ ts: event.ts, type: event.type, summary: summarizeEvent(event) }));
-      }
+      const snapshot = await deps.snapshots.get(session.sessionId);
+      return snapshot?.state === session.state ? snapshot : null;
     } catch (error) {
       deps.logger.warn(
         { err: error, sessionId: session.sessionId },
-        "could not read the event log; events from the session item",
+        "could not read the snapshot; building it live",
       );
+      return null;
     }
-    return eventsFromSession(session);
   }
 
   return {
@@ -51,11 +78,15 @@ export function createDashboardService(deps: {
       if (!session) throw notFound("Session not found.");
       const scenario = await deps.scenarios.get(session.scenarioId);
       if (!scenario) throw notFound("Scenario not found.");
+      if (!isTerminal(session.state)) {
+        const snapshot = await cached(session);
+        if (snapshot) return snapshot;
+      }
 
       const base = {
         session,
         scenario,
-        events: await recentEvents(session),
+        events: await loadRecentEvents(session, deps.events, deps.logger),
         now: deps.clock.now(),
       };
       const minimal = () => ({
