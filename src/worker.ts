@@ -20,7 +20,7 @@ const DRAIN_TIMEOUT_MS = 25_000;
 const { config, logger } = bootstrap("worker");
 const aws = createAwsClients(config);
 const backed = createAwsBackedServices(config, logger, aws);
-const { redis, lock, events } = createRedisServices(config, logger);
+const { redis, lock, events, streaks } = createRedisServices(config, logger);
 const services = {
   config,
   logger,
@@ -29,6 +29,7 @@ const services = {
   cluster: await createMockCluster(config, backed.scenarios),
   ...(lock ? { lock } : {}),
   ...(events ? { events } : {}),
+  ...(streaks ? { streaks } : {}),
 };
 
 /** Aborted on SIGTERM; every loop (consumer, monitor) stops on it (CONVENTIONS §10). */

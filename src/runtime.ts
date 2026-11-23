@@ -13,7 +13,9 @@ import { createAuthMiddleware, createCognitoVerifier } from "./modules/auth/inde
 import {
   createDashboardService,
   createInMemoryHealthStreakStore,
+  createRedisHealthStreakStore,
   dashboardRouter,
+  type HealthStreakStore,
 } from "./modules/dashboard/index.js";
 import {
   createEventFlusher,
@@ -73,6 +75,8 @@ export type Services = {
   lock?: Lock;
   /** The session event log (D-20), only when `REDIS_URL` is set. */
   events?: EventLog;
+  /** The resolution streak in Redis (BE-099); in worker memory without it (D-26). */
+  streaks?: HealthStreakStore;
   /** For the event flush (`FILES_BUCKET`); absent in `dev:local --in-memory`. */
   s3?: Pick<S3Client, "send">;
 };
@@ -84,13 +88,20 @@ export type Services = {
 export function createRedisServices(
   config: Pick<Config, "REDIS_URL">,
   logger: Logger,
-): { redis?: Redis; lock?: Lock; events?: EventLog; readinessChecks: ReadinessCheck[] } {
+): {
+  redis?: Redis;
+  lock?: Lock;
+  events?: EventLog;
+  streaks?: HealthStreakStore;
+  readinessChecks: ReadinessCheck[];
+} {
   if (!config.REDIS_URL) return { readinessChecks: [] };
   const redis = createRedis(config.REDIS_URL, logger);
   return {
     redis,
     lock: createRedisLock({ redis }),
     events: createRedisEventLog({ redis, logger }),
+    streaks: createRedisHealthStreakStore({ redis }),
     readinessChecks: [createRedisReadinessCheck(redis)],
   };
 }
@@ -212,8 +223,8 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
 export function startWorkerLoops(services: Services, signal: AbortSignal): Promise<void>[] {
   const { config, logger, clock, sessions, scenarios, queue, cluster } = services;
   const orchestration = createOrchestration(services);
-  // One worker replica (D-08), so the streak can live in memory until Redis (D-26).
-  const streaks = createInMemoryHealthStreakStore();
+  // Without Redis: one worker replica (D-08), so the streak can live in memory (D-26).
+  const streaks = services.streaks ?? createInMemoryHealthStreakStore();
   const shared = {
     sessions,
     scenarios,

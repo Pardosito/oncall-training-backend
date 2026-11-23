@@ -7,6 +7,7 @@ import {
   serviceHealth,
 } from "./dashboard.builder.js";
 import { DashboardSnapshotSchema } from "./dashboard.schemas.js";
+import { describeHealthStreakContract } from "../../test-support/health-streak.contract.js";
 import { createInMemoryHealthStreakStore, isResolved } from "./resolution.js";
 
 const scenario = {
@@ -217,3 +218,8 @@ describe("resolution", () => {
     expect(await streaks.record("b", true)).toBe(2);
   });
 });
+
+describeHealthStreakContract("in memory", () => ({
+  store: createInMemoryHealthStreakStore(),
+  sessionId: "s-1",
+}));

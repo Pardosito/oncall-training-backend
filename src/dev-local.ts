@@ -60,7 +60,10 @@ function scenariosFromDisk(): ScenariosRepo {
   return createStaticScenariosRepo(parseScenarioFiles(files, logger));
 }
 
-let backed: Pick<Services, "sessions" | "scenarios" | "queue" | "lock" | "events" | "s3">;
+let backed: Pick<
+  Services,
+  "sessions" | "scenarios" | "queue" | "lock" | "events" | "streaks" | "s3"
+>;
 let readinessChecks: ReadinessCheck[] = [];
 if (inMemory) {
   backed = {
@@ -75,6 +78,7 @@ if (inMemory) {
   const redisServices = createRedisServices(config, logger);
   if (redisServices.lock) backed = { ...backed, lock: redisServices.lock };
   if (redisServices.events) backed = { ...backed, events: redisServices.events };
+  if (redisServices.streaks) backed = { ...backed, streaks: redisServices.streaks };
   readinessChecks = [...createAwsReadinessChecks(aws, config), ...redisServices.readinessChecks];
 }
 

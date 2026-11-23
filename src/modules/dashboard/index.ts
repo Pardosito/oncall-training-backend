@@ -18,6 +18,9 @@ export {
 export type { DashboardSnapshot, ServiceHealth } from "./dashboard.schemas.js";
 export {
   createInMemoryHealthStreakStore,
+  createRedisHealthStreakStore,
+  HEALTH_STREAK_TTL_SECONDS,
+  healthStreakKey,
   isResolved,
   REQUIRED_HEALTHY_CHECKS,
 } from "./resolution.js";

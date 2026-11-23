@@ -233,15 +233,15 @@ The worker needs `userId` to read an item, which is why every queue message carr
 
 ### 7.2 Redis keys
 
-| Key                        | Type                               | TTL                         | Purpose                              |
-| -------------------------- | ---------------------------------- | --------------------------- | ------------------------------------ |
-| `lock:active-session`      | string (sessionId)                 | warmup + maxResolve + 180 s | Global lock (D-05)                   |
-| `session:{id}:events`      | list (JSON events)                 | 2 h                         | Event buffer until flush             |
-| `session:{id}:health`      | string (consecutive healthy count) | 1 h                         | Resolution detection                 |
-| `dashboard:{id}`           | string (JSON snapshot)             | 10 s, refreshed every 2 s   | Polling target                       |
-| `action:{actionId}`        | string                             | 24 h                        | Idempotency (SET NX before applying) |
-| `stats:{userId}:{query}`   | string (JSON rows)                 | 5 min                       | Athena cache                         |
-| `leaderboard:{scenarioId}` | string (JSON)                      | 60 s                        | Leaderboard cache                    |
+| Key                        | Type                               | TTL                         | Purpose                                                                                       |
+| -------------------------- | ---------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `lock:active-session`      | string (sessionId)                 | warmup + maxResolve + 180 s | Global lock (D-05)                                                                            |
+| `session:{id}:events`      | list (JSON events)                 | 2 h                         | Event buffer until flush                                                                      |
+| `session:{id}:health`      | string (consecutive healthy count) | 1 h                         | Resolution detection: `INCR` on healthy, `SET 0` on unhealthy; in worker memory without Redis |
+| `dashboard:{id}`           | string (JSON snapshot)             | 10 s, refreshed every 2 s   | Polling target                                                                                |
+| `action:{actionId}`        | string                             | 24 h                        | Idempotency (SET NX before applying)                                                          |
+| `stats:{userId}:{query}`   | string (JSON rows)                 | 5 min                       | Athena cache                                                                                  |
+| `leaderboard:{scenarioId}` | string (JSON)                      | 60 s                        | Leaderboard cache                                                                             |
 
 Redis is a cache plus a lock. **Nothing durable lives only in Redis**, except the event buffer during a session (see DECISIONS, limitations).
 
