@@ -13,44 +13,44 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 ## 1. Decision log
 
-| ID   | Date       | Decision                                                                                                                                  | Status                           |
-| ---- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| D-01 | 2026-10-22 | Split into three repos: backend, frontend, infra                                                                                          | Decided                          |
-| D-02 | 2026-10-22 | TypeScript (ESM) + Express 5 + pnpm + Vitest                                                                                              | Decided                          |
-| D-03 | 2026-10-22 | Feature modules with factory-function dependency injection                                                                                | Decided                          |
-| D-04 | 2026-10-22 | OpenAPI generated from zod is the frontend contract                                                                                       | Decided                          |
-| D-05 | 2026-10-22 | Only one active session in the whole system (Redis global lock)                                                                           | Decided                          |
-| D-06 | 2026-10-22 | Two processes from one image: `api` and `worker`                                                                                          | Decided                          |
-| D-07 | 2026-10-22 | The worker monitors the mock system and detects resolution                                                                                | Decided                          |
-| D-08 | 2026-10-22 | The worker runs as a single replica                                                                                                       | Decided                          |
-| D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                                                                              | Decided                          |
-| D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                                                                                  | Decided                          |
-| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path                                                             | Decided                          |
-| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`                                                             | Decided                          |
-| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                                                                         | Decided                          |
-| D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                                                                                | Decided                          |
-| D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                                                                                | Decided                          |
-| D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404                                                              | Decided                          |
-| D-17 | 2026-10-22 | AWS credentials come from the node role (`LabRole`); no IRSA or Pod Identity                                                              | Decided (forced by Learner Lab)  |
-| D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches                                                      | Decided                          |
-| D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                                                                               | Decided                          |
-| D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end                                                          | Decided                          |
-| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                                                                      | Decided                          |
-| D-22 | 2026-10-22 | Docs written in English                                                                                                                   | Decided                          |
-| D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles                                                               | Decided                          |
-| D-24 | 2026-10-27 | Nov 5 MVP: direct orchestration, no Redis, dev auth in EKS                                                                                | Decided (temporary until Nov 19) |
-| D-25 | 2026-11-01 | Mode-dependent env vars are optional in the schema and required only by mode                                                              | Decided                          |
-| D-26 | 2026-11-01 | Redis client (BE-023) deferred to M2; `/readyz` checks only DynamoDB and S3 until then                                                    | Decided (temporary until Nov 19) |
-| D-27 | 2026-11-01 | One image built for `linux/amd64`, tagged with the short git SHA, pushed only by `release.yml`                                            | Decided                          |
-| D-28 | 2026-11-01 | Contract first: MVP schemas and routes go into `openapi.json` before their handlers; `FAULT` follows infra §7 with a shared fixture       | Decided                          |
-| D-29 | 2026-11-02 | MVP local loop: `dev:local` runs api + worker + fake injector in one process; direct mode sends `SESSION_ENDED`                           | Decided                          |
-| D-30 | 2026-11-02 | MVP busy check: `SESSION_BUSY` from a filtered DynamoDB scan for an active session (no Redis lock)                                        | Decided (temporary until Nov 19) |
-| D-31 | 2026-11-02 | MVP worker semantics: timeouts in the monitor, resolution = every target up, no action idempotency key                                    | Decided (temporary until Nov 19) |
-| D-32 | 2026-11-21 | Step Functions mode: the worker stores the `AWAIT_FIX` token and answers it; the state machine writes the end state and owns the timeouts | Decided                          |
-| D-33 | 2026-11-22 | Global lock in Redis when `REDIS_URL` is set: released after the reset, early on a warmup abandon, never by a non-holder                  | Decided                          |
-| D-34 | 2026-11-22 | The lock stores the owner (`lock:active-session:owner`); with Redis the monitor follows it and writes dashboard snapshots                 | Decided                          |
-| D-35 | 2026-11-25 | No CloudFront in the lab: SPA on the S3 website endpoint, API on the ALB, CORS only for the `CORS_ORIGINS` allowlist | Decided (replaces D-21 in AWS)   |
-| D-36 | 2026-11-25 | Stats come from DynamoDB (one `Query` on the user's partition), not Athena/Glue; leaderboard from the `Leaderboard` GSI | Decided (replaces the Athena design) |
+| ID   | Date       | Decision                                                                                                                                  | Status                               |
+| ---- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| D-01 | 2026-10-22 | Split into three repos: backend, frontend, infra                                                                                          | Decided                              |
+| D-02 | 2026-10-22 | TypeScript (ESM) + Express 5 + pnpm + Vitest                                                                                              | Decided                              |
+| D-03 | 2026-10-22 | Feature modules with factory-function dependency injection                                                                                | Decided                              |
+| D-04 | 2026-10-22 | OpenAPI generated from zod is the frontend contract                                                                                       | Decided                              |
+| D-05 | 2026-10-22 | Only one active session in the whole system (Redis global lock)                                                                           | Decided                              |
+| D-06 | 2026-10-22 | Two processes from one image: `api` and `worker`                                                                                          | Decided                              |
+| D-07 | 2026-10-22 | The worker monitors the mock system and detects resolution                                                                                | Decided                              |
+| D-08 | 2026-10-22 | The worker runs as a single replica                                                                                                       | Decided                              |
+| D-09 | 2026-10-22 | Step Functions waits for the fix with the task-token pattern                                                                              | Decided                              |
+| D-10 | 2026-10-22 | Score computed in backend code, passed to Step Functions                                                                                  | Decided                              |
+| D-11 | 2026-10-22 | Step Functions sends `SESSION_ENDED` to `user-actions` on every terminal path                                                             | Decided                              |
+| D-12 | 2026-10-22 | The injector marks the session `INCIDENT_ACTIVE` and appends `FAULT_INJECTED`                                                             | Decided                              |
+| D-13 | 2026-10-22 | `user-actions` is a FIFO queue grouped by session                                                                                         | Decided                              |
+| D-14 | 2026-10-22 | Dashboard updates by polling every 2 s (no WebSockets/SSE)                                                                                | Decided                              |
+| D-15 | 2026-10-22 | `VIEW_LOGS` is a synchronous API call, not a queued action                                                                                | Decided                              |
+| D-16 | 2026-10-22 | Session ownership enforced by the partition key; other users' sessions → 404                                                              | Decided                              |
+| D-17 | 2026-10-22 | AWS credentials come from the node role (`LabRole`); no IRSA or Pod Identity                                                              | Decided (forced by Learner Lab)      |
+| D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches                                                      | Decided                              |
+| D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                                                                               | Decided                              |
+| D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end                                                          | Decided                              |
+| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                                                                      | Decided                              |
+| D-22 | 2026-10-22 | Docs written in English                                                                                                                   | Decided                              |
+| D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles                                                               | Decided                              |
+| D-24 | 2026-10-27 | Nov 5 MVP: direct orchestration, no Redis, dev auth in EKS                                                                                | Decided (temporary until Nov 19)     |
+| D-25 | 2026-11-01 | Mode-dependent env vars are optional in the schema and required only by mode                                                              | Decided                              |
+| D-26 | 2026-11-01 | Redis client (BE-023) deferred to M2; `/readyz` checks only DynamoDB and S3 until then                                                    | Decided (temporary until Nov 19)     |
+| D-27 | 2026-11-01 | One image built for `linux/amd64`, tagged with the short git SHA, pushed only by `release.yml`                                            | Decided                              |
+| D-28 | 2026-11-01 | Contract first: MVP schemas and routes go into `openapi.json` before their handlers; `FAULT` follows infra §7 with a shared fixture       | Decided                              |
+| D-29 | 2026-11-02 | MVP local loop: `dev:local` runs api + worker + fake injector in one process; direct mode sends `SESSION_ENDED`                           | Decided                              |
+| D-30 | 2026-11-02 | MVP busy check: `SESSION_BUSY` from a filtered DynamoDB scan for an active session (no Redis lock)                                        | Decided (temporary until Nov 19)     |
+| D-31 | 2026-11-02 | MVP worker semantics: timeouts in the monitor, resolution = every target up, no action idempotency key                                    | Decided (temporary until Nov 19)     |
+| D-32 | 2026-11-21 | Step Functions mode: the worker stores the `AWAIT_FIX` token and answers it; the state machine writes the end state and owns the timeouts | Decided                              |
+| D-33 | 2026-11-22 | Global lock in Redis when `REDIS_URL` is set: released after the reset, early on a warmup abandon, never by a non-holder                  | Decided                              |
+| D-34 | 2026-11-22 | The lock stores the owner (`lock:active-session:owner`); with Redis the monitor follows it and writes dashboard snapshots                 | Decided                              |
+| D-35 | 2026-11-25 | No CloudFront in the lab: SPA on the S3 website endpoint, API on the ALB, CORS only for the `CORS_ORIGINS` allowlist                      | Decided (replaces D-21 in AWS)       |
+| D-36 | 2026-11-25 | Stats come from DynamoDB (one `Query` on the user's partition), not Athena/Glue; leaderboard from the `Leaderboard` GSI                   | Decided (replaces the Athena design) |
 
 ---
 

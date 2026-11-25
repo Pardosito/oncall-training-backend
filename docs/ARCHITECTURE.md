@@ -47,7 +47,7 @@ The worker runs as a single replica on purpose: only one session exists at a tim
 | `orchestration` | Wrapper over Step Functions: `start`, `completeTask`, `failTask`.                                                                                        | Step Functions                             |
 | `events`        | Session event log: append to a Redis list; flush to S3 as NDJSON at session end.                                                                         | Redis, S3                                  |
 | `scoring`       | Pure functions: TTD, TTR, score. No I/O.                                                                                                                 | none                                       |
-| `stats`         | Computes the current user's chart rows from their sessions in DynamoDB (D-36).                                                                         | DynamoDB                                   |
+| `stats`         | Computes the current user's chart rows from their sessions in DynamoDB (D-36).                                                                           | DynamoDB                                   |
 | `leaderboard`   | Top scores per scenario; cached.                                                                                                                         | DynamoDB GSI, Redis                        |
 
 Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `redis.ts`, `k8s.ts`, `logger.ts`, `errors.ts`, `lock.ts`, `http/` (validate, error handler, request id).
@@ -58,14 +58,14 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 - On every request the `auth` middleware verifies the access token and sets `req.user = { userId: sub, username }`. Both values come only from the verified token, never from the body, query or a header (except `x-dev-user` in `AUTH_MODE=dev`).
 - **Separation rules:**
 
-| Data                                  | Keyed by                                              | Who can read it                                                 |
-| ------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
-| Session item, score, TTD/TTR          | DynamoDB PK `user_id`                                 | Only that user (reads always use `PK = req.user.userId`)        |
-| History (`/api/me/sessions`)          | `Query` on `user_id`                                  | Only that user                                                  |
-| Stats (`/api/me/stats/*`)             | `Query` on `user_id` (D-36)                           | Only that user                                                  |
-| Dashboard, actions, logs of a session | Session ownership checked first                       | Only the session owner                                          |
-| Event log lines                       | `user_id` column                                      | Backend only (feeds that user's stats)                          |
-| Leaderboard                           | GSI by `scenario_id`                                  | Everyone, but only `username`, `score`, `ttrSeconds`, `endedAt` |
+| Data                                  | Keyed by                        | Who can read it                                                 |
+| ------------------------------------- | ------------------------------- | --------------------------------------------------------------- |
+| Session item, score, TTD/TTR          | DynamoDB PK `user_id`           | Only that user (reads always use `PK = req.user.userId`)        |
+| History (`/api/me/sessions`)          | `Query` on `user_id`            | Only that user                                                  |
+| Stats (`/api/me/stats/*`)             | `Query` on `user_id` (D-36)     | Only that user                                                  |
+| Dashboard, actions, logs of a session | Session ownership checked first | Only the session owner                                          |
+| Event log lines                       | `user_id` column                | Backend only (feeds that user's stats)                          |
+| Leaderboard                           | GSI by `scenario_id`            | Everyone, but only `username`, `score`, `ttrSeconds`, `endedAt` |
 
 - `username` is copied onto the session item when it's created, so the leaderboard doesn't need a Cognito lookup. If a user changes their name in Cognito, old leaderboard rows keep the old name (accepted).
 - Tests must cover the ownership checks: user B gets **404** for user A's session, dashboard, actions, logs and abandon.
@@ -424,7 +424,7 @@ Parsed once at startup by `src/config/` (`loadConfig(env, "api" | "worker")`). I
 | `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` | api          | _conditional_: required when `AUTH_MODE=cognito`                                                                                                                                              |
 | `AUTH_MODE`                                  | api          | `cognito` (default) \| `dev` (**refuses to start unless `NODE_ENV=development` or `ALLOW_DEV_AUTH=true`**)                                                                                    |
 | `ALLOW_DEV_AUTH`                             | api          | `false` (default). `true` lets `AUTH_MODE=dev` start outside development and logs a warning (MVP only, D-24)                                                                                  |
-| `CORS_ORIGINS`                               | api          | Comma-separated origins allowed cross-origin (D-35), e.g. the S3 website endpoint. Empty (default): no CORS headers                                                                            |
+| `CORS_ORIGINS`                               | api          | Comma-separated origins allowed cross-origin (D-35), e.g. the S3 website endpoint. Empty (default): no CORS headers                                                                           |
 | `MOCK_CLUSTER`                               | both         | `kubernetes` (default) \| `fake` (in-memory, for local/frontend dev and tests)                                                                                                                |
 | `MOCK_NAMESPACE`                             | both         | `mock` (default)                                                                                                                                                                              |
 | `MOCK_HEALTH_URL_TEMPLATE`                   | both         | `http://{service}.mock.svc.cluster.local:8080/health` (default; must contain `{service}`). The api uses it too in the MVP: it builds the dashboard per request (BE-130)                       |
