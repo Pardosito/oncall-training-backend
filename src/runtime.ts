@@ -47,6 +47,8 @@ import {
   type SessionsRepo,
   sessionsRouter,
 } from "./modules/sessions/index.js";
+import { createLeaderboardService, leaderboardRouter } from "./modules/leaderboard/index.js";
+import { createStatsService, statsRouter } from "./modules/stats/index.js";
 import { openApiRouter } from "./openapi/openapi.routes.js";
 import type { AwsClients } from "./platform/aws.js";
 import { type Clock, systemClock } from "./platform/clock.js";
@@ -212,6 +214,8 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
           ...recorder,
         }),
       }),
+      statsRouter({ service: createStatsService({ sessions }) }),
+      leaderboardRouter({ service: createLeaderboardService({ sessions, scenarios }) }),
       dashboardRouter({
         service: createDashboardService({
           sessions,

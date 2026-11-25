@@ -47,7 +47,7 @@ The worker runs as a single replica on purpose: only one session exists at a tim
 | `orchestration` | Wrapper over Step Functions: `start`, `completeTask`, `failTask`.                                                                                        | Step Functions                             |
 | `events`        | Session event log: append to a Redis list; flush to S3 as NDJSON at session end.                                                                         | Redis, S3                                  |
 | `scoring`       | Pure functions: TTD, TTR, score. No I/O.                                                                                                                 | none                                       |
-| `stats`         | Runs named Athena queries for the current user; caches results.                                                                                          | Athena, Redis                              |
+| `stats`         | Computes the current user's chart rows from their sessions in DynamoDB (D-36).                                                                         | DynamoDB                                   |
 | `leaderboard`   | Top scores per scenario; cached.                                                                                                                         | DynamoDB GSI, Redis                        |
 
 Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `redis.ts`, `k8s.ts`, `logger.ts`, `errors.ts`, `lock.ts`, `http/` (validate, error handler, request id).
@@ -62,7 +62,7 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 | ------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
 | Session item, score, TTD/TTR          | DynamoDB PK `user_id`                                 | Only that user (reads always use `PK = req.user.userId`)        |
 | History (`/api/me/sessions`)          | `Query` on `user_id`                                  | Only that user                                                  |
-| Stats (`/api/me/stats/*`)             | Athena `WHERE user_id = ?` + Redis `stats:{userId}:…` | Only that user                                                  |
+| Stats (`/api/me/stats/*`)             | `Query` on `user_id` (D-36)                           | Only that user                                                  |
 | Dashboard, actions, logs of a session | Session ownership checked first                       | Only the session owner                                          |
 | Event log lines                       | `user_id` column                                      | Backend only (feeds that user's stats)                          |
 | Leaderboard                           | GSI by `scenario_id`                                  | Everyone, but only `username`, `score`, `ttrSeconds`, `endedAt` |
@@ -165,7 +165,7 @@ Sessions are always read with `PK = caller's userId`, so another user's session 
 | `GET /api/sessions/:sessionId/logs?service=` | —                                                   | 200 `{ service, lines: string[] }`            | 404, 409, 422                                              |
 | `POST /api/sessions/:sessionId/abandon`      | —                                                   | 202                                           | 404, 409                                                   |
 | `GET /api/me/sessions?limit=&cursor=`        | —                                                   | 200 `{ items: SessionView[], nextCursor? }`   | —                                                          |
-| `GET /api/me/stats/:queryName`               | `queryName ∈ score-over-time \| ttd-ttr-by-attempt` | 200 `{ rows: [...] }`                         | 404 unknown query, 504 Athena timeout                      |
+| `GET /api/me/stats/:queryName`               | `queryName ∈ score-over-time \| ttd-ttr-by-attempt` | 200 `{ query, rows: [...] }`                  | 400 unknown query                                          |
 | `GET /api/leaderboard/:scenarioId?limit=10`  | —                                                   | 200 `LeaderboardEntry[]`                      | 404                                                        |
 
 **Error body** (always):

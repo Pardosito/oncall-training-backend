@@ -245,6 +245,63 @@
         ],
         "type": "string"
       },
+      "LeaderboardEntry": {
+        "properties": {
+          "endedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "isYou": {
+            "type": "boolean"
+          },
+          "rank": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "score": {
+            "type": "number"
+          },
+          "ttdSeconds": {
+            "type": "integer"
+          },
+          "ttrSeconds": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "wrongActions": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rank",
+          "username",
+          "score",
+          "wrongActions",
+          "isYou"
+        ],
+        "type": "object"
+      },
+      "LeaderboardResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardEntry"
+            },
+            "type": "array"
+          },
+          "scenarioId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenarioId",
+          "entries"
+        ],
+        "type": "object"
+      },
       "LogsResponse": {
         "properties": {
           "lines": {
@@ -260,6 +317,25 @@
         "required": [
           "service",
           "lines"
+        ],
+        "type": "object"
+      },
+      "MySessionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionView"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -413,6 +489,42 @@
         ],
         "type": "object"
       },
+      "ScoreRow": {
+        "properties": {
+          "attempt": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "endedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "scenarioId": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "sessionId": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          }
+        },
+        "required": [
+          "attempt",
+          "sessionId",
+          "scenarioId",
+          "endedAt",
+          "state",
+          "score"
+        ],
+        "type": "object"
+      },
       "ServiceHealth": {
         "enum": [
           "healthy",
@@ -526,6 +638,105 @@
           "createdAt"
         ],
         "type": "object"
+      },
+      "StatsQueryName": {
+        "enum": [
+          "score-over-time",
+          "ttd-ttr-by-attempt"
+        ],
+        "type": "string"
+      },
+      "StatsResponse": {
+        "oneOf": [
+          {
+            "properties": {
+              "query": {
+                "enum": [
+                  "score-over-time"
+                ],
+                "type": "string"
+              },
+              "rows": {
+                "items": {
+                  "$ref": "#/components/schemas/ScoreRow"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "query",
+              "rows"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "query": {
+                "enum": [
+                  "ttd-ttr-by-attempt"
+                ],
+                "type": "string"
+              },
+              "rows": {
+                "items": {
+                  "$ref": "#/components/schemas/TtdTtrRow"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "query",
+              "rows"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "TtdTtrRow": {
+        "properties": {
+          "attempt": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "endedAt": {
+            "example": "2026-11-05T18:04:12.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "scenarioId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "ttdSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ttrSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "attempt",
+          "sessionId",
+          "scenarioId",
+          "endedAt",
+          "state",
+          "ttdSeconds",
+          "ttrSeconds"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -544,6 +755,238 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/leaderboard/{scenarioId}": {
+      "get": {
+        "description": "The only shared view (AGENTS §3): username and score, never user ids. Ties keep the GSI order.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenarioId",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponse"
+                }
+              }
+            },
+            "description": "Ranked entries"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or not yours (`NOT_FOUND`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Top scores of a scenario (resolved attempts, every user)",
+        "tags": [
+          "leaderboard"
+        ]
+      }
+    },
+    "/api/me/sessions": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "example": "01JBQ4ZJ8V2N7K3M5P6R8S9T0W",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySessionsResponse"
+                }
+              }
+            },
+            "description": "One page of sessions"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The caller's session history, newest first",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/me/stats/{queryName}": {
+      "get": {
+        "description": "`score-over-time`: score of every ended attempt. `ttd-ttr-by-attempt`: time to detect and to resolve per ended attempt. Only the caller's sessions (D-36).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queryName",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/StatsQueryName"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            },
+            "description": "Rows for the chart"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Malformed request (`VALIDATION_ERROR`, `MALFORMED_JSON`)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Missing or invalid credentials (`UNAUTHORIZED`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error (`INTERNAL`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One of the caller's performance stats, oldest attempt first",
+        "tags": [
+          "stats"
+        ]
+      }
+    },
     "/api/openapi.json": {
       "get": {
         "responses": {

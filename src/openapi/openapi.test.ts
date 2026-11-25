@@ -10,8 +10,11 @@ import { openApiRouter } from "./openapi.routes.js";
 describe("OpenAPI document", () => {
   const document = buildOpenApiDocument();
 
-  it("registers the MVP routes", () => {
+  it("registers every route", () => {
     expect(Object.keys(document.paths ?? {}).sort()).toEqual([
+      "/api/leaderboard/{scenarioId}",
+      "/api/me/sessions",
+      "/api/me/stats/{queryName}",
       "/api/openapi.json",
       "/api/scenarios",
       "/api/scenarios/{scenarioId}",

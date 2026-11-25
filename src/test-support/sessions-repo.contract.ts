@@ -168,5 +168,45 @@ export function describeSessionsRepoContract(
     it("refuses a task token for a missing session", async () => {
       expect(await repo.setTaskToken(newSession(), "token-1", at(1))).toBe(false);
     });
+
+    it("lists only the user's sessions, newest first, page by page", async () => {
+      const ids = [ulid(at(1).getTime()), ulid(at(2).getTime()), ulid(at(3).getTime())];
+      for (const sessionId of ids) await repo.create(makeSession({ userId, sessionId }));
+      await repo.create(makeSession({ userId: `${userId}-other`, sessionId: ulid() }));
+
+      const first = await repo.listByUser(userId, { limit: 2 });
+      expect(first.items.map((s) => s.sessionId)).toEqual([ids[2], ids[1]]);
+      expect(first.nextCursor).toBe(ids[1]);
+
+      const rest = await repo.listByUser(userId, { limit: 2, cursor: first.nextCursor });
+      expect(rest.items.map((s) => s.sessionId)).toEqual([ids[0]]);
+      expect(rest.nextCursor).toBeUndefined();
+    });
+
+    it("ranks resolved sessions of a scenario by score", async () => {
+      const scenarioId = `scenario-${ulid()}`;
+      const ended = async (state: "RESOLVED" | "FAILED", score: number) => {
+        const session = makeSession({
+          userId,
+          sessionId: ulid(),
+          scenarioId,
+          state: "INCIDENT_ACTIVE",
+        });
+        await repo.create(session);
+        await repo.transition(session, {
+          from: "INCIDENT_ACTIVE",
+          to: state,
+          at: at(5),
+          set: { score, endedAt: at(5).toISOString() },
+        });
+      };
+      await ended("RESOLVED", 70);
+      await ended("RESOLVED", 90);
+      await ended("FAILED", 0);
+      await ended("RESOLVED", 80);
+
+      const top = await repo.topScores(scenarioId, 2);
+      expect(top.map((s) => s.score)).toEqual([90, 80]);
+    });
   });
 }

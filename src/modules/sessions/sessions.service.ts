@@ -128,5 +128,10 @@ export function createSessionsService(deps: {
       if (!session) throw notFound("Session not found.");
       return session;
     },
+
+    /** The caller's history, newest first (BE-069). Always keyed by the token's userId. */
+    listMySessions(user: AuthUser, page: { limit: number; cursor?: string }) {
+      return deps.sessions.listByUser(user.userId, page);
+    },
   };
 }

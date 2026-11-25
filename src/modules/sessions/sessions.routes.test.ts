@@ -56,6 +56,31 @@ describe("sessions routes", () => {
     expect(other.status).toBe(404);
   });
 
+  it("GET /api/me/sessions lists only the caller's sessions and validates the query", async () => {
+    const app = makeApp();
+    const created = await request(app)
+      .post("/api/sessions")
+      .set("x-dev-user", "user-a")
+      .send({ scenarioId: "orders-down" });
+    const { sessionId } = bodyOf<{ sessionId: string }>(created);
+
+    const mine = await request(app).get("/api/me/sessions?limit=5").set("x-dev-user", "user-a");
+    expect(mine.status).toBe(200);
+    expect(bodyOf<{ items: { sessionId: string }[] }>(mine).items.map((s) => s.sessionId)).toEqual([
+      sessionId,
+    ]);
+
+    const theirs = await request(app).get("/api/me/sessions").set("x-dev-user", "user-b");
+    expect(bodyOf(theirs)).toEqual({ items: [] });
+
+    const bad = await request(app).get("/api/me/sessions?limit=0").set("x-dev-user", "user-a");
+    expect(bad.status).toBe(400);
+    const badCursor = await request(app)
+      .get("/api/me/sessions?cursor=nope")
+      .set("x-dev-user", "user-a");
+    expect(badCursor.status).toBe(400);
+  });
+
   it("returns 409 SESSION_BUSY for a second start", async () => {
     const app = makeApp();
     const start = (user: string) =>

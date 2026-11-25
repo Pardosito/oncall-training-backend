@@ -50,6 +50,7 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 | D-33 | 2026-11-22 | Global lock in Redis when `REDIS_URL` is set: released after the reset, early on a warmup abandon, never by a non-holder                  | Decided                          |
 | D-34 | 2026-11-22 | The lock stores the owner (`lock:active-session:owner`); with Redis the monitor follows it and writes dashboard snapshots                 | Decided                          |
 | D-35 | 2026-11-25 | No CloudFront in the lab: SPA on the S3 website endpoint, API on the ALB, CORS only for the `CORS_ORIGINS` allowlist | Decided (replaces D-21 in AWS)   |
+| D-36 | 2026-11-25 | Stats come from DynamoDB (one `Query` on the user's partition), not Athena/Glue; leaderboard from the `Leaderboard` GSI | Decided (replaces the Athena design) |
 
 ---
 
@@ -262,6 +263,12 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 **Why:** the team can't use CloudFront in the Learner Lab, so the SPA is served from the S3 website endpoint and calls the API on the ALB: two origins. Same-origin (D-21) is no longer possible in AWS.
 **How:** `CORS_ORIGINS` (comma-separated) lists the exact origins allowed. For each, the api answers preflights and sets `Access-Control-Allow-Origin` to that origin, exposes `x-request-id`, and never allows credentials (the API uses bearer tokens). Unset, no CORS headers are sent, so `pnpm dev` with the Vite proxy behaves as before.
 **Trade-off:** one preflight per new request shape (cached 10 min); the ALB is plain HTTP (infra D-31).
+
+### D-36 · Stats from DynamoDB instead of Athena
+
+**Why:** Glue and Athena can't be used with the Learner Lab role, and every number the two charts need (score, TTD, TTR per attempt) is already on the session item. A user has at most a few hundred sessions, so one `Query` on `user_id` plus a pure function is cheap, fast (no 2–20 s Athena latency) and testable.
+**How:** `GET /api/me/stats/:queryName` pages `listByUser` (newest 500 sessions, `MAX_SESSIONS`) and computes `score-over-time` or `ttd-ttr-by-attempt` in `stats.compute.ts`. Ended attempts only, numbered oldest first. No Redis cache: the query is as cheap as a cache read. `GET /api/leaderboard/:scenarioId` queries the `Leaderboard` GSI (score descending), keeps `RESOLVED` attempts, ranks ties equally and marks the caller's rows with `isYou` instead of returning user ids.
+**Trade-off:** no ad-hoc analytics over the event log; the session events still land in S3 for that (`events` module). `STATS_MODE`, `ATHENA_*` stay in the config but are unused.
 
 ## 3. Current limitations
 

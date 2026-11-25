@@ -48,10 +48,23 @@ export async function createTempSessionsTable(aws: AwsClients): Promise<string> 
       AttributeDefinitions: [
         { AttributeName: "user_id", AttributeType: "S" },
         { AttributeName: "session_id", AttributeType: "S" },
+        { AttributeName: "scenario_id", AttributeType: "S" },
+        { AttributeName: "score", AttributeType: "N" },
       ],
       KeySchema: [
         { AttributeName: "user_id", KeyType: "HASH" },
         { AttributeName: "session_id", KeyType: "RANGE" },
+      ],
+      // Same GSI as infra's Terraform and local/init (ARCHITECTURE §7.1).
+      GlobalSecondaryIndexes: [
+        {
+          IndexName: "Leaderboard",
+          KeySchema: [
+            { AttributeName: "scenario_id", KeyType: "HASH" },
+            { AttributeName: "score", KeyType: "RANGE" },
+          ],
+          Projection: { ProjectionType: "ALL" },
+        },
       ],
     }),
   );

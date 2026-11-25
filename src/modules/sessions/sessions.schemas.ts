@@ -77,6 +77,16 @@ export const CreateSessionResponseSchema = z
 
 export const SessionParamsSchema = z.object({ sessionId: UlidSchema });
 
+/** `GET /api/me/sessions` (BE-069). The cursor is the last `sessionId` of the previous page. */
+export const MySessionsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  cursor: UlidSchema.optional(),
+});
+
+export const MySessionsResponseSchema = z
+  .object({ items: z.array(SessionViewSchema), nextCursor: UlidSchema.optional() })
+  .meta({ id: "MySessionsResponse" });
+
 export function registerSessionsOpenApi(registry: OpenAPIRegistry): void {
   registry.registerPath({
     method: "post",
@@ -90,6 +100,18 @@ export function registerSessionsOpenApi(registry: OpenAPIRegistry): void {
     responses: {
       201: { description: "Session created", ...jsonContent(CreateSessionResponseSchema) },
       ...errorResponses(400, 401, 404, 409),
+    },
+  });
+  registry.registerPath({
+    method: "get",
+    path: "/api/me/sessions",
+    tags: ["sessions"],
+    summary: "The caller's session history, newest first",
+    security: [{ [BEARER_AUTH]: [] }],
+    request: { query: MySessionsQuerySchema },
+    responses: {
+      200: { description: "One page of sessions", ...jsonContent(MySessionsResponseSchema) },
+      ...errorResponses(400, 401),
     },
   });
   registry.registerPath({

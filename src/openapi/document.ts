@@ -2,15 +2,16 @@ import { OpenApiGeneratorV31 } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { registerActionsOpenApi } from "../modules/actions/index.js";
 import { registerDashboardOpenApi } from "../modules/dashboard/index.js";
+import { registerLeaderboardOpenApi } from "../modules/leaderboard/index.js";
 import { registerScenariosOpenApi } from "../modules/scenarios/index.js";
 import { registerSessionsOpenApi } from "../modules/sessions/index.js";
+import { registerStatsOpenApi } from "../modules/stats/index.js";
 import { createRegistry, ErrorBodySchema, jsonContent } from "./registry.js";
 
 export const API_VERSION = "0.1.0";
 
 /**
- * The frontend contract (D-04). Only routes that exist (or exist in the Nov 5 MVP) are registered;
- * M2+ routes (history, stats, leaderboard) join when they're built.
+ * The frontend contract (D-04). Only routes that exist are registered.
  */
 export function buildOpenApiDocument() {
   const registry = createRegistry();
@@ -57,6 +58,8 @@ export function buildOpenApiDocument() {
   registerSessionsOpenApi(registry);
   registerActionsOpenApi(registry);
   registerDashboardOpenApi(registry);
+  registerStatsOpenApi(registry);
+  registerLeaderboardOpenApi(registry);
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: "3.1.0",
