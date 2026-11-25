@@ -113,7 +113,7 @@ oncall-training-backend/
 4. **Contracts first.** Every request, response, SQS message, DynamoDB item and scenario has a zod schema. Change the schema, run `pnpm openapi`, update `docs/ARCHITECTURE.md`. CI fails if `openapi.json` is stale.
 5. **Business logic never imports the AWS SDK, ioredis or the k8s client directly.** It goes through repos and gateways in its module or in `platform/` (see CONVENTIONS §3), so it can be unit-tested.
 6. **Tests are part of the change.** New logic in `scoring`, fix validation, state transitions, message parsing or the lock needs unit tests in the same PR.
-7. **No CORS middleware.** The SPA and API share an origin through CloudFront (`/api/*`). Adding `cors()` hides a routing bug.
+7. **CORS only through `CORS_ORIGINS`** (D-35). Without CloudFront the SPA (S3 website) and the API (ALB) are different origins; the allowlist is explicit, never `*`, never with credentials.
 8. **Learner Lab constraints apply** (AWS Academy, `LabRole` only, us-east-1, credentials rotate per session). Don't design anything that needs creating IAM roles. See `docs/DECISIONS.md`.
 9. Follow `docs/CONVENTIONS.md`. Prefer small PRs, one concern each.
 
