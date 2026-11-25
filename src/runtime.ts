@@ -184,6 +184,7 @@ export function buildApiApp(services: Services, readinessChecks: ReadinessCheck[
   return createApp({
     logger,
     readinessChecks,
+    corsOrigins: config.CORS_ORIGINS,
     auth,
     publicRouters: [openApiRouter()],
     routers: [

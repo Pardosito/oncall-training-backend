@@ -49,6 +49,7 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 | D-32 | 2026-11-21 | Step Functions mode: the worker stores the `AWAIT_FIX` token and answers it; the state machine writes the end state and owns the timeouts | Decided                          |
 | D-33 | 2026-11-22 | Global lock in Redis when `REDIS_URL` is set: released after the reset, early on a warmup abandon, never by a non-holder                  | Decided                          |
 | D-34 | 2026-11-22 | The lock stores the owner (`lock:active-session:owner`); with Redis the monitor follows it and writes dashboard snapshots                 | Decided                          |
+| D-35 | 2026-11-25 | No CloudFront in the lab: SPA on the S3 website endpoint, API on the ALB, CORS only for the `CORS_ORIGINS` allowlist | Decided (replaces D-21 in AWS)   |
 
 ---
 
@@ -255,6 +256,12 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 **Why:** BE-100 needs the active session's `userId` to read its item, and the lock only held the `sessionId`. Without it, the monitor scanned `Sessions` every 2 s (D-30).
 **How:** the api's acquire writes `lock:active-session` = sessionId and `lock:active-session:owner` = userId with the same TTL, in one Lua script (only if the lock was won); the release deletes both. The lock value stays the plain sessionId, so the compare-and-delete and `holder()` are unchanged. With Redis the monitor reads both keys: no lock means no DynamoDB or k8s calls; a lock without an owner (taken before this change) falls back to the scan. Each tick stores `dashboard:{id}` (10 s TTL) from the same mock-system read that feeds the resolution streak, during the warmup too. The api serves it when its `state` matches the session item and builds the snapshot live otherwise (missing, invalid, older than a state change, Redis error), so a stopped monitor only costs k8s calls.
 **Trade-off:** a snapshot can be up to 2 s old; that's the polling interval anyway.
+
+### D-35 · CORS for the S3 website origin (no CloudFront)
+
+**Why:** the team can't use CloudFront in the Learner Lab, so the SPA is served from the S3 website endpoint and calls the API on the ALB: two origins. Same-origin (D-21) is no longer possible in AWS.
+**How:** `CORS_ORIGINS` (comma-separated) lists the exact origins allowed. For each, the api answers preflights and sets `Access-Control-Allow-Origin` to that origin, exposes `x-request-id`, and never allows credentials (the API uses bearer tokens). Unset, no CORS headers are sent, so `pnpm dev` with the Vite proxy behaves as before.
+**Trade-off:** one preflight per new request shape (cached 10 min); the ALB is plain HTTP (infra D-29).
 
 ## 3. Current limitations
 

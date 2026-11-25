@@ -46,6 +46,17 @@ export const ConfigSchema = z.object({
   ALLOW_DEV_AUTH: z.stringbool().default(false),
   COGNITO_USER_POOL_ID: optionalString,
   COGNITO_CLIENT_ID: optionalString,
+  /** Comma-separated origins allowed to call the API cross-origin (D-35). Empty = no CORS headers. */
+  CORS_ORIGINS: z
+    .string()
+    .default("")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((origin) => origin.trim().replace(/\/$/, ""))
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.url())),
 
   MOCK_CLUSTER: z.enum(["kubernetes", "fake"]).default("kubernetes"),
   MOCK_NAMESPACE: z.string().min(1).default("mock"),

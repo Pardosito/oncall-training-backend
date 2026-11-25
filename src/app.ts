@@ -1,6 +1,7 @@
 import express, { type Express, type RequestHandler, type Router } from "express";
 import { pinoHttp } from "pino-http";
 import type { Logger } from "./platform/logger.js";
+import { corsAllowlist } from "./platform/http/cors.js";
 import { errorHandler, notFoundHandler } from "./platform/http/error-handler.js";
 import { healthRouter, type ReadinessCheck } from "./platform/http/health.js";
 import { requestId } from "./platform/http/request-id.js";
@@ -14,14 +15,16 @@ export type AppDeps = {
   publicRouters?: Router[];
   /** Feature routers, mounted at `/api` after auth. */
   routers?: Router[];
+  /** Origins allowed cross-origin (D-35). Empty: no CORS headers, as with CloudFront (D-21). */
+  corsOrigins?: readonly string[];
   /** Override for tests. */
   generateRequestId?: () => string;
 };
 
 /**
  * Builds the Express app with the middleware order from CONVENTIONS §4:
- * request id → pino-http → json → health → auth → routers → 404 → error handler.
- * No `cors` (D-21): the SPA and the API share an origin.
+ * request id → pino-http → [cors] → json → health → auth → routers → 404 → error handler.
+ * CORS only for the explicit `CORS_ORIGINS` allowlist (D-35); none when the SPA and API share an origin.
  */
 export function createApp(deps: AppDeps): Express {
   const app = express();
@@ -37,6 +40,7 @@ export function createApp(deps: AppDeps): Express {
       autoLogging: { ignore: (req) => req.url === "/healthz" || req.url === "/readyz" },
     }),
   );
+  if (deps.corsOrigins?.length) app.use(corsAllowlist(deps.corsOrigins));
   app.use(express.json({ limit: "100kb" }));
 
   app.use(healthRouter({ checks: deps.readinessChecks, logger: deps.logger }));
