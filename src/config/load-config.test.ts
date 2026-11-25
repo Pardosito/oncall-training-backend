@@ -70,6 +70,28 @@ describe("loadConfig", () => {
     expect(error.issues).toEqual([expect.stringContaining("MOCK_CLUSTER")]);
   });
 
+  describe("CORS_ORIGINS", () => {
+    it("is empty when unset", () => {
+      expect(loadConfig(apiEnv, "api").CORS_ORIGINS).toEqual([]);
+    });
+
+    it("normalizes each entry to the origin a browser sends", () => {
+      const config = loadConfig(
+        { ...apiEnv, CORS_ORIGINS: " http://Site.Example:80/ , https://b.example:8443" },
+        "api",
+      );
+      expect(config.CORS_ORIGINS).toEqual(["http://site.example", "https://b.example:8443"]);
+    });
+
+    it.each(["not a url", "http://site.example/app", "http://site.example/?x=1"])(
+      "rejects %s",
+      (value) => {
+        const error = errorOf(() => loadConfig({ ...apiEnv, CORS_ORIGINS: value }, "api"));
+        expect(error.issues).toEqual([expect.stringContaining("CORS_ORIGINS")]);
+      },
+    );
+  });
+
   it("treats empty strings as unset for optional vars", () => {
     const config = loadConfig({ ...apiEnv, REDIS_URL: "", AWS_ENDPOINT_URL: "" }, "api");
     expect(config.REDIS_URL).toBeUndefined();

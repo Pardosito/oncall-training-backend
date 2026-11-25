@@ -59,7 +59,7 @@ Rules:
 - Build the app in `createApp(deps)` (`src/app.ts`); `src/api.ts` only loads config, wires dependencies and calls `listen`. Tests use `createApp` with fakes and `supertest`.
 - Async handlers can just `throw`; Express 5 forwards rejected promises to the error handler. No `try/catch` in routes just to call `next(err)`, and no `express-async-handler`.
 - Validate with a shared middleware: `validate({ params, query, body })` using zod. In Express 5 `req.query` is read-only, so put parsed values on `res.locals.input` (typed helper) and don't assign to `req.query`.
-- Middleware order: request id → pino-http → `express.json({ limit: "100kb" })` → health routes → auth → module routers → 404 → error handler.
+- Middleware order: request id → pino-http → cors (when `CORS_ORIGINS` is set) → `express.json({ limit: "100kb" })` → health routes → auth → module routers → 404 → error handler.
 - Express 5 path syntax: wildcards must be named (`/*splat`); no regex-ish strings like `/:id?`.
 - Every route is registered in the OpenAPI registry with its schemas. If it isn't in `openapi.json`, it doesn't exist for the frontend.
 - Status codes: 200 read, 201 create, 202 accepted (queued), 204 no body, 400 malformed, 401 no/invalid token, 404 not found **or not yours**, 409 state conflict, 422 valid shape but not allowed, 500 bug, 503 dependency down, 504 upstream timeout.
