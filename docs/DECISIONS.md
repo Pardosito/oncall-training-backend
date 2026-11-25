@@ -261,7 +261,7 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 
 **Why:** the team can't use CloudFront in the Learner Lab, so the SPA is served from the S3 website endpoint and calls the API on the ALB: two origins. Same-origin (D-21) is no longer possible in AWS.
 **How:** `CORS_ORIGINS` (comma-separated) lists the exact origins allowed. For each, the api answers preflights and sets `Access-Control-Allow-Origin` to that origin, exposes `x-request-id`, and never allows credentials (the API uses bearer tokens). Unset, no CORS headers are sent, so `pnpm dev` with the Vite proxy behaves as before.
-**Trade-off:** one preflight per new request shape (cached 10 min); the ALB is plain HTTP (infra D-29).
+**Trade-off:** one preflight per new request shape (cached 10 min); the ALB is plain HTTP (infra D-31).
 
 ## 3. Current limitations
 
