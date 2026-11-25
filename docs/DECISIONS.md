@@ -35,7 +35,7 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 | D-18 | 2026-10-22 | LocalStack for local AWS; dev auth, fake cluster and fixture stats as local switches                                                      | Decided                          |
 | D-19 | 2026-10-22 | Scenario definitions live in this repo and are synced to S3                                                                               | Decided                          |
 | D-20 | 2026-10-22 | Event log buffered in Redis during a session, flushed to S3 as NDJSON at the end                                                          | Decided                          |
-| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                                                                      | Decided                          |
+| D-21 | 2026-10-22 | No CORS: the API is only reached through the SPA's CloudFront origin                                                                      | Superseded in AWS by D-35        |
 | D-22 | 2026-10-22 | Docs written in English                                                                                                                   | Decided                          |
 | D-23 | 2026-10-22 | Per-user separation via Cognito `sub`; no users table; no editable profiles                                                               | Decided                          |
 | D-24 | 2026-10-27 | Nov 5 MVP: direct orchestration, no Redis, dev auth in EKS                                                                                | Decided (temporary until Nov 19) |
@@ -155,6 +155,8 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 **Trade-off:** if Redis is lost mid-session, that session's detailed events are lost (L-03). The score and timestamps are still safe in DynamoDB.
 
 ### D-21 · No CORS
+
+**Superseded in AWS by D-35** (no CloudFront in the lab). Still holds wherever the SPA and the API share an origin.
 
 **Why:** CloudFront serves both the SPA (`/*`) and the API (`/api/*`) from one domain, so the browser never makes a cross-origin call. Adding CORS middleware would hide a misrouted request instead of surfacing it.
 

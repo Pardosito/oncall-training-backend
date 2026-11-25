@@ -11,10 +11,11 @@ const ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
 export function corsAllowlist(origins: readonly string[]): RequestHandler {
   const allowed = new Set(origins);
   return (req, res, next) => {
+    // Every response varies on Origin, so a cache can't serve one origin's answer to another.
+    res.vary("Origin");
     const origin = req.get("origin");
     if (!origin || !allowed.has(origin)) return next();
 
-    res.vary("Origin");
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-expose-headers", "x-request-id");
     if (req.method === "OPTIONS" && req.get("access-control-request-method")) {
