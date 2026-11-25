@@ -1,6 +1,8 @@
 export {
   CreateSessionBodySchema,
   CreateSessionResponseSchema,
+  MySessionsQuerySchema,
+  MySessionsResponseSchema,
   FailureReasonSchema,
   SessionParamsSchema,
   SessionSchema,
@@ -20,9 +22,16 @@ export {
   ACTIVE_STATES,
   createDynamoSessionsRepo,
   createInMemorySessionsRepo,
+  LEADERBOARD_INDEX,
   SessionStateConflict,
 } from "./sessions.repo.js";
-export type { SessionKey, SessionsRepo, Transition, TransitionFields } from "./sessions.repo.js";
+export type {
+  SessionKey,
+  SessionPage,
+  SessionsRepo,
+  Transition,
+  TransitionFields,
+} from "./sessions.repo.js";
 export { createSessionsService } from "./sessions.service.js";
 export type { SessionsService } from "./sessions.service.js";
 export { sessionsRouter } from "./sessions.routes.js";

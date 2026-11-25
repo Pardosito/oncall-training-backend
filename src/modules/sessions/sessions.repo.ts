@@ -3,6 +3,7 @@ import {
   type DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
@@ -68,7 +69,18 @@ export type SessionsRepo = {
   setTaskToken(key: SessionKey, token: string, at: Date): Promise<boolean>;
   /** The stored task token, if any. Never log it. */
   getTaskToken(key: SessionKey): Promise<string | undefined>;
+  /**
+   * One user's sessions, newest first (BE-059). `cursor` is the last `sessionId` of the previous
+   * page; the key always uses the caller's `userId`, so a cursor can't reach another user's items.
+   */
+  listByUser(userId: string, page: { limit: number; cursor?: string }): Promise<SessionPage>;
+  /** Highest-scoring resolved sessions of a scenario, from the `Leaderboard` GSI (BE-114). */
+  topScores(scenarioId: string, limit: number): Promise<Session[]>;
 };
+
+export type SessionPage = { items: Session[]; nextCursor?: string };
+
+export const LEADERBOARD_INDEX = "Leaderboard";
 
 function assertTransition({ from, to }: Transition): void {
   if (!canTransition(from, to)) throw new Error(`illegal session transition ${from} → ${to}`);
@@ -251,6 +263,48 @@ export function createDynamoSessionsRepo(deps: {
       const token: unknown = Item?.task_token;
       return typeof token === "string" ? token : undefined;
     },
+
+    async listByUser(userId, { limit, cursor }) {
+      const page = await ddb.send(
+        new QueryCommand({
+          TableName,
+          KeyConditionExpression: "user_id = :u",
+          ExpressionAttributeValues: { ":u": userId },
+          // session_id is a ULID: descending = newest first.
+          ScanIndexForward: false,
+          Limit: limit,
+          ...(cursor ? { ExclusiveStartKey: Key({ userId, sessionId: cursor }) } : {}),
+        }),
+      );
+      const items = (page.Items ?? []).map(fromItem);
+      const last: unknown = page.LastEvaluatedKey?.session_id;
+      return { items, ...(typeof last === "string" ? { nextCursor: last } : {}) };
+    },
+
+    async topScores(scenarioId, limit) {
+      const top: Session[] = [];
+      let ExclusiveStartKey: Record<string, unknown> | undefined;
+      // Only resolved sessions rank. The GSI is sparse (only RESOLVED items carry `score`), so the
+      // filter is defensive: it keeps the page clean if another state ever gets a score.
+      do {
+        const page = await ddb.send(
+          new QueryCommand({
+            TableName,
+            IndexName: LEADERBOARD_INDEX,
+            KeyConditionExpression: "scenario_id = :s",
+            FilterExpression: "#state = :resolved",
+            ExpressionAttributeNames: { "#state": "state" },
+            ExpressionAttributeValues: { ":s": scenarioId, ":resolved": "RESOLVED" },
+            ScanIndexForward: false,
+            Limit: limit,
+            ExclusiveStartKey,
+          }),
+        );
+        top.push(...(page.Items ?? []).map(fromItem));
+        ExclusiveStartKey = page.LastEvaluatedKey;
+      } while (ExclusiveStartKey && top.length < limit);
+      return top.slice(0, limit);
+    },
   };
 }
 
@@ -341,6 +395,29 @@ export function createInMemorySessionsRepo(): SessionsRepo & { all(): Session[] 
 
     getTaskToken(key) {
       return Promise.resolve(tokens.get(id(key)));
+    },
+
+    listByUser(userId, { limit, cursor }) {
+      const mine = [...items.values()]
+        .filter((s) => s.userId === userId && (!cursor || s.sessionId < cursor))
+        .sort((a, b) => b.sessionId.localeCompare(a.sessionId));
+      const page = mine.slice(0, limit).map(copy);
+      const last = page.at(-1);
+      return Promise.resolve({
+        items: page,
+        ...(mine.length > limit && last ? { nextCursor: last.sessionId } : {}),
+      });
+    },
+
+    topScores(scenarioId, limit) {
+      const top = [...items.values()]
+        .filter(
+          (s) => s.scenarioId === scenarioId && s.state === "RESOLVED" && s.score !== undefined,
+        )
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .slice(0, limit)
+        .map(copy);
+      return Promise.resolve(top);
     },
   };
 }
