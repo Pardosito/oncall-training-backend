@@ -49,7 +49,7 @@ Add a new entry whenever something is decided or changed; don't rewrite history.
 | D-32 | 2026-11-21 | Step Functions mode: the worker stores the `AWAIT_FIX` token and answers it; the state machine writes the end state and owns the timeouts | Decided                          |
 | D-33 | 2026-11-22 | Global lock in Redis when `REDIS_URL` is set: released after the reset, early on a warmup abandon, never by a non-holder                  | Decided                          |
 | D-34 | 2026-11-22 | The lock stores the owner (`lock:active-session:owner`); with Redis the monitor follows it and writes dashboard snapshots                 | Decided                          |
-| D-35 | 2026-11-25 | No CloudFront in the lab: SPA on the S3 website endpoint, API on the ALB, CORS only for the `CORS_ORIGINS` allowlist | Decided (replaces D-21 in AWS)   |
+| D-35 | 2026-11-25 | No CloudFront in the lab: SPA on the S3 website endpoint, API on the ALB, CORS only for the `CORS_ORIGINS` allowlist                      | Decided (replaces D-21 in AWS)   |
 
 ---
 
