@@ -284,7 +284,8 @@ export function createDynamoSessionsRepo(deps: {
     async topScores(scenarioId, limit) {
       const top: Session[] = [];
       let ExclusiveStartKey: Record<string, unknown> | undefined;
-      // Only resolved sessions rank; the GSI also holds failed ones with a score of 0.
+      // Only resolved sessions rank. The GSI is sparse (only RESOLVED items carry `score`), so the
+      // filter is defensive: it keeps the page clean if another state ever gets a score.
       do {
         const page = await ddb.send(
           new QueryCommand({

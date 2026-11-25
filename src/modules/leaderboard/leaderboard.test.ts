@@ -38,6 +38,21 @@ describe("rank", () => {
   });
 });
 
+describe("leaderboard names", () => {
+  it("shows 'player' instead of a user id when the username is missing or equals the user id", () => {
+    const entries = rank(
+      [resolved("user-x", "user-x", 90), resolved("user-y", "", 80), resolved("user-z", "zoe", 70)],
+      "user-z",
+    );
+    expect(entries.map((e) => [e.username, e.isYou])).toEqual([
+      ["player", false],
+      ["player", false],
+      ["zoe", true],
+    ]);
+    expect(JSON.stringify(entries)).not.toContain("user-x");
+  });
+});
+
 describe("GET /api/leaderboard/:scenarioId", () => {
   async function makeApp() {
     const sessions = createInMemorySessionsRepo();

@@ -183,30 +183,49 @@ export function describeSessionsRepoContract(
       expect(rest.nextCursor).toBeUndefined();
     });
 
+    /** Ends a fresh active session of `scenarioId` in `state` with `score`. */
+    const endSession = async (scenarioId: string, state: "RESOLVED" | "FAILED", score: number) => {
+      const session = makeSession({
+        userId,
+        sessionId: ulid(),
+        scenarioId,
+        state: "INCIDENT_ACTIVE",
+      });
+      await repo.create(session);
+      await repo.transition(session, {
+        from: "INCIDENT_ACTIVE",
+        to: state,
+        at: at(5),
+        set: { score, endedAt: at(5).toISOString() },
+      });
+    };
+
     it("ranks resolved sessions of a scenario by score", async () => {
       const scenarioId = `scenario-${ulid()}`;
-      const ended = async (state: "RESOLVED" | "FAILED", score: number) => {
-        const session = makeSession({
-          userId,
-          sessionId: ulid(),
-          scenarioId,
-          state: "INCIDENT_ACTIVE",
-        });
-        await repo.create(session);
-        await repo.transition(session, {
-          from: "INCIDENT_ACTIVE",
-          to: state,
-          at: at(5),
-          set: { score, endedAt: at(5).toISOString() },
-        });
-      };
-      await ended("RESOLVED", 70);
-      await ended("RESOLVED", 90);
-      await ended("FAILED", 0);
-      await ended("RESOLVED", 80);
+      await endSession(scenarioId, "RESOLVED", 70);
+      await endSession(scenarioId, "RESOLVED", 90);
+      await endSession(scenarioId, "FAILED", 0);
+      await endSession(scenarioId, "RESOLVED", 80);
 
       const top = await repo.topScores(scenarioId, 2);
       expect(top.map((s) => s.score)).toEqual([90, 80]);
+    });
+
+    it("keeps reading past a first page that is all filtered-out rows", async () => {
+      // Higher-scored FAILED rows sort first and fill the whole first page. The Dynamo query applies
+      // Limit before the filter, so the repo must follow LastEvaluatedKey to find the resolved rows.
+      const scenarioId = `scenario-${ulid()}`;
+      await endSession(scenarioId, "FAILED", 95);
+      await endSession(scenarioId, "FAILED", 92);
+      await endSession(scenarioId, "FAILED", 91);
+      await endSession(scenarioId, "RESOLVED", 70);
+      await endSession(scenarioId, "RESOLVED", 60);
+
+      const top = await repo.topScores(scenarioId, 2);
+      expect(top.map((s) => [s.state, s.score])).toEqual([
+        ["RESOLVED", 70],
+        ["RESOLVED", 60],
+      ]);
     });
   });
 }

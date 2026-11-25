@@ -18,7 +18,7 @@ CloudFront ──► ALB ──► EKS ns:app
    ▼                                        ▼
 DynamoDB Sessions · S3 files bucket        EKS ns:mock  (gateway → orders → worker-svc)
 SQS user-actions (FIFO) · Step Functions   read pods/deployments/logs, scale, restart
-Athena/Glue · ElastiCache Redis
+ElastiCache Redis
                         ▲
 Step Functions ──► SQS faults ──► injector (infra repo) ──► ns:mock
 ```
@@ -29,7 +29,7 @@ The same image runs with different start commands.
 
 | Process    | Command               | Replicas | Does                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------- | --------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **api**    | `node dist/api.js`    | 2        | Stateless HTTP. Validates the JWT and the request, reads and writes DynamoDB, Redis and S3, starts Step Functions executions, enqueues user actions, runs Athena queries, reads pod logs (read-only k8s).                                                                                                                                                                               |
+| **api**    | `node dist/api.js`    | 2        | Stateless HTTP. Validates the JWT and the request, reads and writes DynamoDB, Redis and S3, starts Step Functions executions, enqueues user actions, computes stats and the leaderboard from DynamoDB (D-36), reads pod logs (read-only k8s).                                                                                                                                           |
 | **worker** | `node dist/worker.js` | **1**    | (a) **Actions consumer**: long-polls SQS `user-actions` and applies actions to the mock system. (b) **Monitor loop** (every 2 s while a session is active): reads mock-system state, writes the dashboard snapshot to Redis, detects resolution and calls `SendTaskSuccess`. (c) **Session end**: on `SESSION_ENDED`, flushes logs to S3, resets the mock system and releases the lock. |
 
 The worker runs as a single replica on purpose: only one session exists at a time, and a second monitor would double-resolve. See DECISIONS D-08.
@@ -48,7 +48,7 @@ The worker runs as a single replica on purpose: only one session exists at a tim
 | `events`        | Session event log: append to a Redis list; flush to S3 as NDJSON at session end.                                                                         | Redis, S3                                  |
 | `scoring`       | Pure functions: TTD, TTR, score. No I/O.                                                                                                                 | none                                       |
 | `stats`         | Computes the current user's chart rows from their sessions in DynamoDB (D-36).                                                                           | DynamoDB                                   |
-| `leaderboard`   | Top scores per scenario; cached.                                                                                                                         | DynamoDB GSI, Redis                        |
+| `leaderboard`   | Top scores per scenario: one `Query` on the `Leaderboard` GSI per request. No cache (D-36).                                                              | DynamoDB GSI                               |
 
 Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `redis.ts`, `k8s.ts`, `logger.ts`, `errors.ts`, `lock.ts`, `http/` (validate, error handler, request id).
 
@@ -58,16 +58,17 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 - On every request the `auth` middleware verifies the access token and sets `req.user = { userId: sub, username }`. Both values come only from the verified token, never from the body, query or a header (except `x-dev-user` in `AUTH_MODE=dev`).
 - **Separation rules:**
 
-| Data                                  | Keyed by                        | Who can read it                                                 |
-| ------------------------------------- | ------------------------------- | --------------------------------------------------------------- |
-| Session item, score, TTD/TTR          | DynamoDB PK `user_id`           | Only that user (reads always use `PK = req.user.userId`)        |
-| History (`/api/me/sessions`)          | `Query` on `user_id`            | Only that user                                                  |
-| Stats (`/api/me/stats/*`)             | `Query` on `user_id` (D-36)     | Only that user                                                  |
-| Dashboard, actions, logs of a session | Session ownership checked first | Only the session owner                                          |
-| Event log lines                       | `user_id` column                | Backend only (feeds that user's stats)                          |
-| Leaderboard                           | GSI by `scenario_id`            | Everyone, but only `username`, `score`, `ttrSeconds`, `endedAt` |
+| Data                                  | Keyed by                        | Who can read it                                                                                            |
+| ------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Session item, score, TTD/TTR          | DynamoDB PK `user_id`           | Only that user (reads always use `PK = req.user.userId`)                                                   |
+| History (`/api/me/sessions`)          | `Query` on `user_id`            | Only that user                                                                                             |
+| Stats (`/api/me/stats/*`)             | `Query` on `user_id` (D-36)     | Only that user                                                                                             |
+| Dashboard, actions, logs of a session | Session ownership checked first | Only the session owner                                                                                     |
+| Event log lines                       | `user_id` column                | Backend only (feeds that user's stats)                                                                     |
+| Leaderboard                           | GSI by `scenario_id`            | Everyone, but only the `LeaderboardEntry` fields (no user or session ids; `isYou` marks the caller's rows) |
 
 - `username` is copied onto the session item when it's created, so the leaderboard doesn't need a Cognito lookup. If a user changes their name in Cognito, old leaderboard rows keep the old name (accepted).
+- If a leaderboard row has no usable username (missing, or equal to the user id), it is shown as `player`. The user id is never shown as a name.
 - Tests must cover the ownership checks: user B gets **404** for user A's session, dashboard, actions, logs and abandon.
 
 ## 4. Session lifecycle
@@ -151,22 +152,22 @@ The contract the frontend consumes is `openapi/openapi.json`, generated from the
 Base path `/api`. JSON only. All routes except health and `openapi.json` require `Authorization: Bearer <cognito access token>`.
 Sessions are always read with `PK = caller's userId`, so another user's session id returns **404** (we never reveal it exists).
 
-| Method & path                                | Request                                             | Success                                       | Errors                                                     |
-| -------------------------------------------- | --------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------- |
-| `GET /healthz`                               | —                                                   | 200 `{status:"ok"}` (process alive)           | —                                                          |
-| `GET /readyz`                                | —                                                   | 200 when DynamoDB, Redis and S3 are reachable | 503                                                        |
-| `GET /api/openapi.json`                      | —                                                   | 200 OpenAPI document                          | —                                                          |
-| `GET /api/scenarios`                         | —                                                   | 200 `ScenarioSummary[]`                       | —                                                          |
-| `GET /api/scenarios/:scenarioId`             | —                                                   | 200 `ScenarioPublic` (no `validFixes`)        | 404                                                        |
-| `POST /api/sessions`                         | `{ scenarioId }`                                    | 201 `{ sessionId }`                           | 404 scenario, **409 `SESSION_BUSY`** `{retryAfterSeconds}` |
-| `GET /api/sessions/:sessionId`               | —                                                   | 200 `SessionView`                             | 404                                                        |
-| `GET /api/sessions/:sessionId/dashboard`     | —                                                   | 200 `DashboardSnapshot`                       | 404                                                        |
-| `POST /api/sessions/:sessionId/actions`      | `{ type, target?, params? }`                        | 202 `{ actionId }`                            | 404, 409 `SESSION_NOT_ACTIVE`, 422 `ACTION_NOT_ALLOWED`    |
-| `GET /api/sessions/:sessionId/logs?service=` | —                                                   | 200 `{ service, lines: string[] }`            | 404, 409, 422                                              |
-| `POST /api/sessions/:sessionId/abandon`      | —                                                   | 202                                           | 404, 409                                                   |
-| `GET /api/me/sessions?limit=&cursor=`        | —                                                   | 200 `{ items: SessionView[], nextCursor? }`   | —                                                          |
-| `GET /api/me/stats/:queryName`               | `queryName ∈ score-over-time \| ttd-ttr-by-attempt` | 200 `{ query, rows: [...] }`                  | 400 unknown query                                          |
-| `GET /api/leaderboard/:scenarioId?limit=10`  | —                                                   | 200 `LeaderboardEntry[]`                      | 404                                                        |
+| Method & path                                | Request                                             | Success                                           | Errors                                                     |
+| -------------------------------------------- | --------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `GET /healthz`                               | —                                                   | 200 `{status:"ok"}` (process alive)               | —                                                          |
+| `GET /readyz`                                | —                                                   | 200 when DynamoDB, Redis and S3 are reachable     | 503                                                        |
+| `GET /api/openapi.json`                      | —                                                   | 200 OpenAPI document                              | —                                                          |
+| `GET /api/scenarios`                         | —                                                   | 200 `ScenarioSummary[]`                           | —                                                          |
+| `GET /api/scenarios/:scenarioId`             | —                                                   | 200 `ScenarioPublic` (no `validFixes`)            | 404                                                        |
+| `POST /api/sessions`                         | `{ scenarioId }`                                    | 201 `{ sessionId }`                               | 404 scenario, **409 `SESSION_BUSY`** `{retryAfterSeconds}` |
+| `GET /api/sessions/:sessionId`               | —                                                   | 200 `SessionView`                                 | 404                                                        |
+| `GET /api/sessions/:sessionId/dashboard`     | —                                                   | 200 `DashboardSnapshot`                           | 404                                                        |
+| `POST /api/sessions/:sessionId/actions`      | `{ type, target?, params? }`                        | 202 `{ actionId }`                                | 404, 409 `SESSION_NOT_ACTIVE`, 422 `ACTION_NOT_ALLOWED`    |
+| `GET /api/sessions/:sessionId/logs?service=` | —                                                   | 200 `{ service, lines: string[] }`                | 404, 409, 422                                              |
+| `POST /api/sessions/:sessionId/abandon`      | —                                                   | 202                                               | 404, 409                                                   |
+| `GET /api/me/sessions?limit=&cursor=`        | —                                                   | 200 `{ items: SessionView[], nextCursor? }`       | —                                                          |
+| `GET /api/me/stats/:queryName`               | `queryName ∈ score-over-time \| ttd-ttr-by-attempt` | 200 `{ query, rows: [...] }`                      | 400 unknown query                                          |
+| `GET /api/leaderboard/:scenarioId?limit=10`  | `limit` 1–50, default 10                            | 200 `{ scenarioId, entries: LeaderboardEntry[] }` | 400, 401, 404                                              |
 
 **Error body** (always):
 
@@ -195,7 +196,9 @@ DashboardSnapshot = {
   recentEvents: [{ ts, type, summary }],   // last 20
   availableActions: string[]
 }
-LeaderboardEntry = { rank, username, score, ttrSeconds, sessionId, endedAt }
+LeaderboardEntry = { rank, username, score, ttdSeconds?, ttrSeconds?, wrongActions,
+                     endedAt?, isYou }   // no user or session ids; ties share a rank
+LeaderboardResponse = { scenarioId, entries: LeaderboardEntry[] }
 ```
 
 `error.code` is the `ErrorCode` enum in `openapi.json` (`ErrorCodeSchema` in `platform/errors.ts`); a new code is added there before it can be thrown. **Generic error codes** (any route): `VALIDATION_ERROR` (400, zod issues in `details.issues`), `MALFORMED_JSON` (400), `UNAUTHORIZED` (401), `NOT_FOUND` (404, also unknown routes), `PAYLOAD_TOO_LARGE` (413, body over 100 kB), `UNSUPPORTED_MEDIA_TYPE` (415), `INTERNAL` (500), `NOT_READY` (503, `/readyz` only). Every response carries `x-request-id`; a valid ULID sent by the client is reused.
@@ -241,8 +244,7 @@ The worker needs `userId` to read an item, which is why every queue message carr
 | `session:{id}:health`       | string (consecutive healthy count) | 1 h                         | Resolution detection: `INCR` on healthy, `SET 0` on unhealthy; in worker memory without Redis |
 | `dashboard:{id}`            | string (JSON snapshot)             | 10 s, refreshed every 2 s   | Polling target                                                                                |
 | `action:{actionId}`         | string                             | 24 h                        | Idempotency (SET NX before applying)                                                          |
-| `stats:{userId}:{query}`    | string (JSON rows)                 | 5 min                       | Athena cache                                                                                  |
-| `leaderboard:{scenarioId}`  | string (JSON)                      | 60 s                        | Leaderboard cache                                                                             |
+| `leaderboard:{scenarioId}`  | —                                  | —                           | **Not implemented** (D-36): no cache. Each request runs one GSI query.                        |
 
 Redis is a cache plus a lock. **Nothing durable lives only in Redis**, except the event buffer during a session (see DECISIONS, limitations).
 
@@ -457,7 +459,7 @@ Integration tests (`pnpm test:integration`) create their own throwaway table and
 | Poison message                          | 3 receives → DLQ; logged with `sessionId`                                                                                      |
 | Worker down during a session            | Step Functions times out → `FAILED` → `SESSION_ENDED` is processed when the worker comes back; the lock TTL is the last resort |
 | Redis restart                           | Dashboard rebuilds within 2 s; **lock and unflushed events are lost** (see limitations)                                        |
-| Athena slow                             | Poll up to 20 s, then 504 `STATS_TIMEOUT`; cached results are served if present                                                |
+| Long history                            | Stats read at most the newest 500 sessions (`MAX_SESSIONS`) in pages of 50; older attempts are not charted                     |
 | `SendTaskSuccess` with an expired token | `TaskTimedOut` is caught and logged; the session is already `FAILED`                                                           |
 
 ## 12. Deployment contract (for the infra repo's manifests)

@@ -6,6 +6,14 @@ import type { LeaderboardEntry, LeaderboardResponse } from "./leaderboard.schema
 
 export type LeaderboardService = ReturnType<typeof createLeaderboardService>;
 
+/** Shown when a session has no usable name. Never fall back to the user id (AGENTS §3). */
+export const FALLBACK_NAME = "player";
+
+/** The public name of a session's player: the copied username, unless it is missing or a user id. */
+export function displayName(s: Pick<Session, "userId" | "username">): string {
+  return !s.username || s.username === s.userId ? FALLBACK_NAME : s.username;
+}
+
 /** Ranks sessions already sorted by score (best first); equal scores share a rank. */
 export function rank(top: readonly Session[], callerId: string): LeaderboardEntry[] {
   const entries: LeaderboardEntry[] = [];
@@ -14,7 +22,7 @@ export function rank(top: readonly Session[], callerId: string): LeaderboardEntr
     const previous = entries[i - 1];
     entries.push({
       rank: previous && previous.score === score ? previous.rank : i + 1,
-      username: s.username,
+      username: displayName(s),
       score,
       ...(s.ttdSeconds !== undefined ? { ttdSeconds: s.ttdSeconds } : {}),
       ...(s.ttrSeconds !== undefined ? { ttrSeconds: s.ttrSeconds } : {}),

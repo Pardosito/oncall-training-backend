@@ -18,7 +18,7 @@ export type StatsQueryName = z.infer<typeof StatsQueryNameSchema>;
 export const StatsParamsSchema = z.object({ queryName: StatsQueryNameSchema });
 
 const attemptFields = {
-  /** 1 = the user's first ended session. */
+  /** 1 = the oldest ended session within the newest-500 window (MAX_SESSIONS), not the user's lifetime first. */
   attempt: z.int().min(1),
   sessionId: UlidSchema,
   scenarioId: z.string(),

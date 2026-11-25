@@ -9,7 +9,8 @@ import { createAuthMiddleware } from "../auth/index.js";
 import { createInMemorySessionsRepo, type Session } from "../sessions/index.js";
 import { scoreOverTime, ttdTtrByAttempt } from "./stats.compute.js";
 import { statsRouter } from "./stats.routes.js";
-import { createStatsService } from "./stats.service.js";
+import type { ScoreRow } from "./stats.schemas.js";
+import { createStatsService, MAX_SESSIONS } from "./stats.service.js";
 
 const at = (s: number) => new Date(T0.getTime() + s * 1000);
 const iso = (s: number) => at(s).toISOString();
@@ -51,6 +52,36 @@ describe("stats compute (D-36)", () => {
 
   it("is empty without ended attempts", () => {
     expect(scoreOverTime([])).toEqual([]);
+  });
+});
+
+describe("stats service paging (D-36)", () => {
+  async function repoWith(count: number) {
+    const repo = createInMemorySessionsRepo();
+    // One ended attempt per second, so the ULIDs sort by creation order.
+    for (let i = 1; i <= count; i++) {
+      await repo.create(attempt(i, { state: "RESOLVED", endedAt: iso(i), score: i }));
+    }
+    return repo;
+  }
+  const user = { userId: "user-a", username: "alice" };
+
+  it("reads every page of a user with more than 50 sessions", async () => {
+    const service = createStatsService({ sessions: await repoWith(120) });
+    const { rows } = (await service.get(user, "score-over-time")) as { rows: ScoreRow[] };
+    expect(rows).toHaveLength(120);
+    expect(rows.map((r) => r.attempt)).toEqual(Array.from({ length: 120 }, (_, i) => i + 1));
+    expect(rows.at(-1)?.score).toBe(120);
+  });
+
+  it(`caps the history at MAX_SESSIONS (${MAX_SESSIONS}), keeping the newest`, async () => {
+    const total = MAX_SESSIONS + 20;
+    const service = createStatsService({ sessions: await repoWith(total) });
+    const { rows } = (await service.get(user, "score-over-time")) as { rows: ScoreRow[] };
+    expect(rows).toHaveLength(MAX_SESSIONS);
+    // The window is the newest MAX_SESSIONS; attempt 1 is its oldest ended session.
+    expect(rows[0]?.score).toBe(total - MAX_SESSIONS + 1);
+    expect(rows.at(-1)?.score).toBe(total);
   });
 });
 
