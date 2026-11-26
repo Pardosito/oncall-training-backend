@@ -1,0 +1,13 @@
+{
+  "id": "checkout-failing",
+  "title": "Checkout and orders are failing",
+  "description": "Customers can't place orders. Both the gateway and the orders service report errors.",
+  "warmupSeconds": 20,
+  "maxResolveSeconds": 600,
+  "targets": ["gateway", "orders", "worker-svc"],
+  "baseline": { "gateway": 1, "orders": 2, "worker-svc": 1 },
+  "faults": [{ "type": "SCALE_TO_ZERO", "target": "worker-svc" }],
+  "availableActions": ["ACKNOWLEDGE", "VIEW_LOGS", "RESTART_DEPLOYMENT", "SCALE_DEPLOYMENT"],
+  "validFixes": [{ "type": "SCALE_DEPLOYMENT", "target": "worker-svc", "minReplicas": 1 }],
+  "scoring": { "base": 1000, "perSecondTTD": 1, "perSecondTTR": 1, "perWrongAction": 25 }
+}

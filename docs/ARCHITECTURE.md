@@ -311,6 +311,17 @@ On `SESSION_ENDED` the worker flushes first (an empty buffer means the session w
 }
 ```
 
+**Scenarios** (all use the existing fault and fix types; the state machine and the direct mode inject only the first entry of `faults`):
+
+| id                 | Fault                    | What the user sees                      | Fix                | Limit  | Notes                                                                   |
+| ------------------ | ------------------------ | --------------------------------------- | ------------------ | ------ | ----------------------------------------------------------------------- |
+| `orders-down`      | `orders` scaled to 0     | gateway and orders down                 | scale `orders`     | 10 min | the original                                                            |
+| `checkout-failing` | `worker-svc` scaled to 0 | gateway, orders and worker-svc all down | scale `worker-svc` | 10 min | cascading failure: scaling `orders` is a wrong action                   |
+| `storefront-down`  | `gateway` scaled to 0    | only the gateway down                   | scale `gateway`    | 10 min | warm-up                                                                 |
+| `peak-outage`      | `worker-svc` scaled to 0 | same as `checkout-failing`              | scale `worker-svc` | 3 min  | hard mode: no `VIEW_LOGS` (422), double time cost, 100 per wrong action |
+
+IDs describe the symptom, not the cause, because they appear in URLs. Verified on EKS on 2026-11-26 (Step Functions mode): each one resolves, the scores follow `scoring`, and the mock system returns to `baseline`.
+
 **Public views** (BE-049, `scenarios.views.ts`): `ScenarioSummary` = `id, title, description, maxResolveSeconds`; `ScenarioPublic` = `id, title, description, warmupSeconds, maxResolveSeconds, targets, availableActions, scoring`. `validFixes`, `faults` and `baseline` never leave the backend: they give away the answer. The mappers copy fields one by one, so a new internal field doesn't leak by default.
 
 Score = `max(0, base − perSecondTTD·TTD − perSecondTTR·TTR − perWrongAction·wrong)`. If the user never acknowledged, TTD = TTR.
