@@ -54,7 +54,7 @@ Shared infrastructure lives in `src/platform/`: `aws.ts` (client singletons), `r
 
 ## 3.1 Users and identity
 
-- **Cognito is the user store.** We don't keep a users table. Sign-in, password reset and the first-sign-in password change are Cognito managed login; accounts are invited by infra (`make users`, infra D-32), no self sign-up; the backend has no user routes besides `/api/me/*`.
+- **Cognito is the user store.** We don't keep a users table. Sign-in, password reset and the first-sign-in password change are Cognito managed login; users sign up themselves on the managed login page with an emailed code (infra D-35); the backend has no user routes besides `/api/me/*`.
 - On every request the `auth` middleware verifies the access token and sets `req.user = { userId: sub, username }`. Both values come only from the verified token, never from the body, query or a header (except `x-dev-user` in `AUTH_MODE=dev`).
 - **Separation rules:**
 
